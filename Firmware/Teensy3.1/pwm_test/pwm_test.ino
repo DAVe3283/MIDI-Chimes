@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
 // pwm_test.ino
 //
-// A program to test various PWM functions to see how the chimes respond.
+// A program to test various PWM settings to see how the chimes respond.
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
@@ -21,9 +21,18 @@ const uint8_t led_pin(13);
 const uint16_t strike_time(1000); // milliseconds
 const uint16_t blink_time(20000); // microseconds
 
-// PWM config
-const uint8_t pwm_bits(12);
-const uint32_t pwm_freq(11718); // 11718 Hz is "ideal" for 12 bits on Teensy
+// PWM Config
+// Note: The PIC16F1503 has much more limited PWM capabilities than the Teensy.
+// The following settings are about as good as it gets on the PIC:
+//     1,953 Hz 10-bit @  8 MHz CPU
+//     4,883 Hz 10-bit @ 20 MHz CPU
+//     7,813 Hz 10-bit @  8 MHz CPU
+//     9,766 Hz  9-bit @ 20 MHz CPU
+//    15,625 Hz  9-bit @  8 MHz CPU
+//    19,531 Hz 10-bit @ 20 MHz CPU
+const uint8_t pwm_bits(10);
+const uint32_t pwm_freq(9766);
+
 
 // -----------------------------------------------------------------------------
 // Declarations

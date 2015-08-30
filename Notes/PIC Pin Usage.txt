@@ -1,3 +1,6 @@
+Looks like I can run 3 chimes per PIC without issue. The 4th PWM channel
+conflicts with I2C and SPI, so I wouldn't be able to talk to the PIC.
+
 Pin		Function
 ===		========
 Pin 1	Vdd (+5V, ICSP)
@@ -17,15 +20,12 @@ Pin 14	Vss (Ground, ICSP)
 
 Note: I can swap pins 2, 6, & 8 as needed, since they are just digital I/O.
 
-Looks like I can run 3 chimes per PIC without issue. The 4th PWM channel
-conflicts with I2C and SPI, so I wouldn't be able to talk to the chip.
-
 ---==[Analog Pins]==---
 Analog pins are used to measure transistor collector voltage (through a 
 voltage divider).
 This lets me see if they failed in the on state. If I get ambitious, I can also
-see if they are turning on correctly. In either case, I will force the power
-supply off (to prevent burning out a coil and/or a fire), and send a fault
+see if they are turning on correctly. As appropriate, I will force the power
+supply off (to prevent burning out a coil and/or a fire), and/or send a fault
 message back to the Teensy.
 
 ---==[PS_Enable]==---
