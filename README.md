@@ -22,5 +22,5 @@ TODO
 
 Content in each folder may be licensed differently. Overall, I strive to use the
 Unlicense, but some portions may use external libraries preventing that. Those
-portions will be license as necessary. Data sheets and the like are provided for
-reference only, and are subject to all licenses/copyright specified within.
+portions will be licensed as necessary. Data sheets and the like are provided
+for reference only, and are subject to all licenses/copyright specified within.

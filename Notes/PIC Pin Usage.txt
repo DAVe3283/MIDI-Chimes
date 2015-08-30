@@ -1,0 +1,46 @@
+Pin		Function
+===		========
+Pin 1	Vdd (+5V, ICSP)
+Pin 2	RA5 (PS_Enable)
+Pin 3	AN3
+Pin 4	/MCLR (ICSP)
+Pin 5	PWM 1 (Transistor 1)
+Pin 6	
+Pin 7	PWM 2 (Transistor 2)
+Pin 8	RC2 (LED)
+Pin 9	I2C (SDA)
+Pin 10	I2C (SCL)
+Pin 11	PWM 3 (Transistor 3)
+Pin 12	AN1, ICSPCLK
+Pin 13	AN0, ICSPDAT
+Pin 14	Vss (Ground, ICSP)
+
+Note: I can swap pins 2, 6, & 8 as needed, since they are just digital I/O.
+
+Looks like I can run 3 chimes per PIC without issue. The 4th PWM channel
+conflicts with I2C and SPI, so I wouldn't be able to talk to the chip.
+
+---==[Analog Pins]==---
+Analog pins are used to measure transistor collector voltage (through a 
+voltage divider).
+This lets me see if they failed in the on state. If I get ambitious, I can also
+see if they are turning on correctly. In either case, I will force the power
+supply off (to prevent burning out a coil and/or a fire), and send a fault
+message back to the Teensy.
+
+---==[PS_Enable]==---
+This pin is tied to the watchdog timer driven by the Teensy. When toggling, the
+watchdog turns on the power supply. If there is a fault, the PIC will force this
+to ground, in turn forcing the power supply off. The Teensy can detect this, and
+will query the I2C bus to find which module faulted. (I might also query fault
+status periodically from the Teensy.)
+
+---==[LED]==---
+The LED will be illuminated if a fault is detected, allowing the driver board to
+easily be identified for replacement. The Teensy will also display which board
+failed (by I2C address, probably), but this makes things easier.
+
+---==[ICSP]==---
+In Circuit Serial Programming (ICSP) require re-use of the AN0-1 pins. Since
+they are on a voltage divider, this should still work, even with the power
+supply on. If the power supply is off or disconnected, there will be no problem.
