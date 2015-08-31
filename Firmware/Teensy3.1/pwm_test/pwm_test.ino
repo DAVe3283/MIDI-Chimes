@@ -18,27 +18,20 @@ const uint8_t pwm_pin(3);
 const uint8_t led_pin(13);
 
 // Timeouts
-const uint16_t strike_time(1000); // milliseconds
+uint16_t strike_time(90); // milliseconds
+uint16_t settle_time(160); // milliseconds
 const uint16_t blink_time(20000); // microseconds
 
 // PWM Config
-// Note: The PIC16F1503 has much more limited PWM capabilities than the Teensy.
-// The following settings are about as good as it gets on the PIC:
-//     1,953 Hz 10-bit @  8 MHz CPU
-//     4,883 Hz 10-bit @ 20 MHz CPU
-//     7,813 Hz 10-bit @  8 MHz CPU
-//     9,766 Hz  9-bit @ 20 MHz CPU
-//    15,625 Hz  9-bit @  8 MHz CPU
-//    19,531 Hz 10-bit @ 20 MHz CPU
 const uint8_t pwm_bits(10);
-const uint32_t pwm_freq(9766);
+const uint32_t pwm_freq(7813);
 
 
 // -----------------------------------------------------------------------------
 // Declarations
 // -----------------------------------------------------------------------------
 void set_pwm_percent(const uint32_t& percent);
-
+void print_pwm_setup();
 
 // -----------------------------------------------------------------------------
 // Globals
@@ -93,6 +86,7 @@ void loop()
   if (strike && (strike_timer >= strike_time))
   {
     strike = false;
+    strike_timer = 0; // Begin settle timer
     analogWrite(pwm_pin, 0);
   }
 
@@ -123,13 +117,11 @@ void loop()
     case('7'):
     case('8'):
     case('9'):
-      usb.println(incomingByte);
       // pwm_sweep = false;
-      set_pwm_percent((incomingByte - '0') * 10);
+      set_pwm_percent(((incomingByte - '0') * 5) + 50); // Adjust 50% - 100% in 5% steps
       break;
 
     case('/'):
-      usb.println(incomingByte);
       // pwm_sweep = false;
       set_pwm_percent(100);
       break;
@@ -140,21 +132,40 @@ void loop()
     //   usb.println("Sweeping PWM through range!");
     //   break;
 
+    case('\r'):
+      if (!strike && (strike_timer >= settle_time))
+      {
+        usb.println("Striking chime!");
+        strike = true;
+        strike_timer = 0;
+        analogWrite(pwm_pin, duty_cycle);
+      }
+      else
+      {
+        usb.println("Already striking chime! Skipped.");
+      }
+      break;
+
+    case('.'):
+    case('?'):
+      print_pwm_setup();
+      break;
+
     case('+'):
-      usb.println(incomingByte);
-      usb.println("Striking chime!");
-      strike = true;
-      strike_timer = 0;
-      analogWrite(pwm_pin, duty_cycle);
+      // strike_time += 5; // Increase by 5ms
+      settle_time += 5; // Increase by 5ms
+      print_pwm_setup();
+      break;
+
+    case('-'):
+      // strike_time -= 5; // Decrease by 5ms
+      settle_time -= 5; // Decrease by 5ms
+      print_pwm_setup();
       break;
 
     default:
-      // Echo!
+      // Echo unknown commands (sanity check the serial link)
       usb.print(incomingByte);
-      if (incomingByte == '\r')
-      {
-        usb.print('\n');
-      }
       break;
     }
   }
@@ -170,4 +181,29 @@ void set_pwm_percent(const uint32_t& percent)
   usb.print("/");
   usb.print(1 << pwm_bits);
   usb.println(")");
+}
+
+void print_pwm_setup()
+{
+  float dc = static_cast<float>(duty_cycle) / static_cast<float>(1 << pwm_bits) * 100.0;
+  usb.println("Current PWM Settings:");
+  usb.print("  Frequency: ");
+  usb.print(pwm_freq);
+  usb.println(" Hz");
+  usb.print("  Resolution: ");
+  usb.print(pwm_bits);
+  usb.println(" bits");
+  usb.print("  Duty Cycle: ");
+  usb.print(dc);
+  usb.print("% (");
+  usb.print(duty_cycle);
+  usb.print("/");
+  usb.print(1 << pwm_bits);
+  usb.println(")");
+  usb.print("  Strike Time: ");
+  usb.print(strike_time);
+  usb.println(" ms");
+  usb.print("  Settle Time: ");
+  usb.print(settle_time);
+  usb.println(" ms");
 }
