@@ -3,14 +3,13 @@
 The PIC16F1503 has limited PWM frequencies when targeting 9-10 bit resolution.
 
 | Frequency (Hz) | Resolution | CPU Clock | Transistor Temp |    Coil Whine?     |
-| -------------- | ---------- | --------- | --------------- | ------------------ |
-|           1953 | 10-bit     |         8 | <Untested>      | <Untested>         |
-|           4883 | 10-bit     |        20 | Excellent       | Yes, within ~1'    |
-|           7813 | 10-bit     |         8 | Excellent       | Barely, within ~6" |
-|           9766 | 9-bit      |        20 | Good            | Barely, within ~4" |
-|          15625 | 9-bit      |         8 | <Untested>      | <Untested>         |
-|          19531 | 10-bit     |        20 | Needs heatsink  | None               |
-| -------------- | ---------- | --------- | --------------- | ------------------ |
+| -------------: | ---------: | --------: | :-------------- | :----------------- |
+|          1,953 |     10-bit |     8 MHz | <Untested>      | <Untested>         |
+|          4,883 |     10-bit |    20 MHz | Excellent       | Yes, within ~1'    |
+|          7,813 |     10-bit |     8 MHz | Excellent       | Barely, within ~6" |
+|          9,766 |      9-bit |    20 MHz | Good            | Barely, within ~4" |
+|         15,625 |      9-bit |     8 MHz | <Untested>      | <Untested>         |
+|         19,531 |     10-bit |    20 MHz | Needs heatsink  | None               |
 
 All _tested_ settings functioned just fine.
 
@@ -65,14 +64,13 @@ until the counter reaches all the way to 0? Or until cleared by the Teensy?
 
 # Strike Time Tests
 
-| Strike Time (ms) | Minimum PWM DC (%) | Actual On Time (ms) |
-| ---------------- | ------------------ | ------------------- |
-|               45 |                 70 |                31.5 |
-|               55 |                 65 |                35.8 |
-|               65 |                 60 |                39.0 |
-|               85 |                 55 |                46.8 |
-|              120 |                 50 |                60.0 |
-| ---------------- | ------------------ | ------------------- |
+| Strike Time (ms) | Minimum PWM DC | Actual On Time (ms) |
+| ---------------: | -------------: | ------------------: |
+|               45 |            70% |                31.5 |
+|               55 |            65% |                35.8 |
+|               65 |            60% |                39.0 |
+|               85 |            55% |                46.8 |
+|              120 |            50% |                60.0 |
 
 The faster the strike time, the harder it is to control volume. See the volume
 tests below.
@@ -83,7 +81,7 @@ Given a conservative 350 ms settling time, maximum duty cycle (assuming
 back-to-back striking of the chime) can be calculated.
 
 | Strike Time (ms) | Max Duty Cycle (%) |
-| ---------------- | ------------------ |
+| ---------------: | -----------------: |
 |               45 |               11.4 |
 |               50 |               12.5 |
 |               55 |               13.6 |
@@ -96,7 +94,6 @@ back-to-back striking of the chime) can be calculated.
 |               90 |               20.5 |
 |              100 |               22.2 |
 |              125 |               26.3 |
-| ---------------- | ------------------ |
 
 
 # Chime Volume
@@ -115,50 +112,47 @@ with the chime for a strike time that small combined with a PWM DC that small.
 
 ## 65 ms Strike Time
 
-| PWM % |  SPL  |
-| ----- | ----- |
-|    60 | 57 dB |
-|    65 | 62 dB |
-|    70 | 66 dB |
-|    75 | 68 dB |
-|    80 | 71 dB |
-|    85 | 74 dB |
-|    90 | 75 dB |
-|    95 | 76 dB |
-|   100 | 78 dB |
-| ----- | ----- |
+| PWM DC |  SPL  |
+| -----: | ----: |
+|    60% | 57 dB |
+|    65% | 62 dB |
+|    70% | 66 dB |
+|    75% | 68 dB |
+|    80% | 71 dB |
+|    85% | 74 dB |
+|    90% | 75 dB |
+|    95% | 76 dB |
+|   100% | 78 dB |
 
 ## 85 ms Strike Time
 
-| PWM % |  SPL  |
-| ----- | ----- |
-|    55 | 55 dB |
-|    60 | 58 dB |
-|    65 | 62 dB |
-|    70 | 66 dB |
-|    75 | 67 dB |
-|    80 | 70 dB |
-|    85 | 73 dB |
-|    90 | 74 dB |
-|    95 | 76 dB |
-|   100 | 76 dB |
-| ----- | ----- |
+| PWM DC |  SPL  |
+| -----: | ----: |
+|    55% | 55 dB |
+|    60% | 58 dB |
+|    65% | 62 dB |
+|    70% | 66 dB |
+|    75% | 67 dB |
+|    80% | 70 dB |
+|    85% | 73 dB |
+|    90% | 74 dB |
+|    95% | 76 dB |
+|   100% | 76 dB |
 
 ## 100 ms Strike Time
 
-| PWM % |  SPL  |
-|-------|-------|
-|    55 | 52 dB |
-|    60 | 60 dB |
-|    65 | 63 dB |
-|    70 | 67 dB |
-|    75 | 70 dB |
-|    80 | 72 dB |
-|    85 | 73 dB |
-|    90 | 76 dB |
-|    95 | 77 dB |
-|   100 | 78 dB |
-|-------|-------|
+| PWM DC |  SPL  |
+| -----: | ----: |
+|    55% | 52 dB |
+|    60% | 60 dB |
+|    65% | 63 dB |
+|    70% | 67 dB |
+|    75% | 70 dB |
+|    80% | 72 dB |
+|    85% | 73 dB |
+|    90% | 76 dB |
+|    95% | 77 dB |
+|   100% | 78 dB |
 
 ## Result Summary
 
