@@ -17,6 +17,10 @@ void main()
     // TODO: It looks like the MCC Config generated code is designed to be edited
     // So I can probably just put whatever value I want in there for DC %.
     
+    // TODO: mcc_generated_files/i2c.c allocating more RAM than the chip has.
+    // That is why I think those files are supposed to be edited.
+    // So, edit them! Talk about a dumb sample...
+    
     // Set PWM to 0%, then enable
     PWM1_LoadDutyValue(0x0000);
     PWM2_LoadDutyValue(0x0000);
