@@ -58,8 +58,8 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 void TMR2_Initialize(void) {
     // Set TMR2 to the options selected in the User Interface
 
-    // TMR2ON off; T2CKPS 1:4; T2OUTPS 1:1; 
-    T2CON = 0x01;
+    // TMR2ON off; T2CKPS 1:1; T2OUTPS 1:1; 
+    T2CON = 0x00;
 
     // PR2 255; 
     PR2 = 0xFF;

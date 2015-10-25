@@ -8,7 +8,7 @@ Pin 2	RA5 (PS_Enable)
 Pin 3	AN3
 Pin 4	/MCLR (ICSP)
 Pin 5	PWM 1 (Transistor 1)
-Pin 6	
+Pin 6	RC4 (Address_Latch)
 Pin 7	PWM 2 (Transistor 2)
 Pin 8	RC2 (LED)
 Pin 9	I2C (SDA)
@@ -35,10 +35,19 @@ to ground, in turn forcing the power supply off. The Teensy can detect this, and
 will query the I2C bus to find which module faulted. (I might also query fault
 status periodically from the Teensy.)
 
+---==[Address_Latch]==---
+This pin is used to indicate the I2C address previously broadcast on the bus
+should be the new I2C address of this chip. It is used to allow dynamic address
+selection of a string of driver boards, enabling easy replacement.
+The pin is tied to the LED pin of the previous board (or the master Teensy). If
+the chip is in startup mode, it latches the address. Once it has latched an
+address, it ignores this input for the duration of operation.
+
 ---==[LED]==---
 The LED will be illuminated if a fault is detected, allowing the driver board to
 easily be identified for replacement. The Teensy will also display which board
-failed (by I2C address, probably), but this makes things easier.
+failed, but this makes things even more clear.
+This pin is also used to latch the address into the next chip during startup.
 
 ---==[ICSP]==---
 In Circuit Serial Programming (ICSP) require re-use of the AN0-1 pins. Since

@@ -18,9 +18,10 @@
             <resource customName="SDA" digital="true" direction="BIDIRECTIONAL" function="SDA" module="MSSP" name="RC1" start="true" type="pin" wpu="false"/>
             <resource customName="IO_RC2" digital="true" direction="OUTPUT" function="RC2" module="GPIO" name="RC2" start="true" type="pin" wpu="false"/>
             <resource customName="PWM2" digital="true" direction="OUTPUT" function="PWM2" module="PWM2" name="RC3" start="false" type="pin" wpu="false"/>
+            <resource customName="IO_RC4" digital="true" direction="INPUT" function="RC4" module="GPIO" name="RC4" start="false" type="pin" wpu="false"/>
             <resource customName="PWM1" digital="true" direction="OUTPUT" function="PWM1" module="PWM1" name="RC5" start="false" type="pin" wpu="false"/>
             <file checksum="253724378" modified="false" name="pin_manager.c" path="mcc_generated_files/pin_manager.c"/>
-            <file checksum="3139607113" modified="false" name="pin_manager.h" path="mcc_generated_files/pin_manager.h"/>
+            <file checksum="3705806519" modified="false" name="pin_manager.h" path="mcc_generated_files/pin_manager.h"/>
         </manager>
         <manager generated="true" name="Interrupt Manager" reloadPin="manual">
             <setting name="preemptHigh" option="true"/>
@@ -80,20 +81,20 @@
         <module generated="true" mode="Timer" name="TMR2" order="1" reloadPin="manual" type="tmr_2">
             <initializer comment="" name="Initialize">
                 <setting name="TMR2ON" option="off" register="T2CON"/>
-                <setting name="T2CKPS" option="1:4" register="T2CON"/>
+                <setting name="T2CKPS" option="1:1" register="T2CON"/>
                 <setting name="T2OUTPS" option="1:1" register="T2CON"/>
                 <setting name="PR2" option="255" register="PR2"/>
                 <setting name="TMR2" option="0x0" register="TMR2"/>
-                <additionalSetting name="T2CKPS" option="1:4"/>
+                <additionalSetting name="T2CKPS" option="1:1"/>
                 <additionalSetting name="timerstart" option="enabled"/>
-                <additionalSetting name="maxPeriodChanged" option="2.048 ms"/>
+                <additionalSetting name="maxPeriodChanged" option="512.0 us"/>
                 <additionalSetting name="T2OUTPS" option="1:1"/>
-                <additionalSetting name="minPeriodChanged" option="8.0 us"/>
-                <additionalSetting name="period" option="512.0 us"/>
+                <additionalSetting name="minPeriodChanged" option="2.0 us"/>
+                <additionalSetting name="period" option="128.0 us"/>
             </initializer>
             <setting name="TMRI" option="false"/>
             <setting name="ticker" option="0"/>
-            <file checksum="1625720962" modified="false" name="tmr2.c" path="mcc_generated_files/tmr2.c"/>
+            <file checksum="1366263934" modified="false" name="tmr2.c" path="mcc_generated_files/tmr2.c"/>
             <file checksum="434179208" modified="false" name="tmr2.h" path="mcc_generated_files/tmr2.h"/>
         </module>
         <module generated="true" mode="PWM" name="PWM1" order="2" reloadPin="manual" type="pwm_10bit">
@@ -104,9 +105,9 @@
                 <setting name="PWM1DCH" option="127" register="PWM1DCH"/>
                 <setting name="PWM1DCL" option="192" register="PWM1DCL"/>
                 <additionalSetting name="ccpr" option="511"/>
-                <additionalSetting name="pwmperiod" option="512.000 us"/>
+                <additionalSetting name="pwmperiod" option="128.000 us"/>
                 <additionalSetting name="duty" option="50"/>
-                <additionalSetting name="freq" option="1.9531 kHz"/>
+                <additionalSetting name="freq" option="7.8125 kHz"/>
                 <additionalSetting name="timerselpresence" option="timerselabsent"/>
                 <additionalSetting name="resolution" option="10"/>
                 <additionalSetting name="CTSEL" option="PWM1timer2"/>
@@ -123,9 +124,9 @@
                 <setting name="PWM2DCH" option="127" register="PWM2DCH"/>
                 <setting name="PWM2DCL" option="192" register="PWM2DCL"/>
                 <additionalSetting name="ccpr" option="511"/>
-                <additionalSetting name="pwmperiod" option="512.000 us"/>
+                <additionalSetting name="pwmperiod" option="128.000 us"/>
                 <additionalSetting name="duty" option="50"/>
-                <additionalSetting name="freq" option="1.9531 kHz"/>
+                <additionalSetting name="freq" option="7.8125 kHz"/>
                 <additionalSetting name="timerselpresence" option="timerselabsent"/>
                 <additionalSetting name="resolution" option="10"/>
                 <additionalSetting name="CTSEL" option="PWM2timer2"/>
@@ -142,9 +143,9 @@
                 <setting name="PWM3DCH" option="127" register="PWM3DCH"/>
                 <setting name="PWM3DCL" option="192" register="PWM3DCL"/>
                 <additionalSetting name="ccpr" option="511"/>
-                <additionalSetting name="pwmperiod" option="512.000 us"/>
+                <additionalSetting name="pwmperiod" option="128.000 us"/>
                 <additionalSetting name="duty" option="50"/>
-                <additionalSetting name="freq" option="1.9531 kHz"/>
+                <additionalSetting name="freq" option="7.8125 kHz"/>
                 <additionalSetting name="timerselpresence" option="timerselabsent"/>
                 <additionalSetting name="resolution" option="10"/>
                 <additionalSetting name="CTSEL" option="PWM3timer2"/>
@@ -156,6 +157,7 @@
         <module generated="true" mode="GPIO" name="GPIO" order="5" reloadPin="manual" type="GPIO">
             <resource customName="IO_RA5" digital="true" direction="OUTPUT" function="RA5" ioc="0" module="GPIO" name="RA5" start="false" type="pin" wpu="false"/>
             <resource customName="IO_RC2" digital="true" direction="OUTPUT" function="RC2" module="GPIO" name="RC2" start="true" type="pin" wpu="false"/>
+            <resource customName="IO_RC4" digital="true" direction="INPUT" function="RC4" module="GPIO" name="RC4" start="false" type="pin" wpu="false"/>
         </module>
         <module generated="true" mode="I2C Slave Interrupt" name="MSSP" order="6" reloadPin="manual" type="mssp">
             <initializer comment="" name="Initialize">

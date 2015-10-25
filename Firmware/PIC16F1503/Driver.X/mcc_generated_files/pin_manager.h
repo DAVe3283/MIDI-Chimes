@@ -197,6 +197,17 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 
 #define PWM2_SetAnalogMode()   do { ANSC3 = 1; } while(0)
 #define PWM2_SetDigitalMode()   do { ANSC3 = 0; } while(0)
+// get/set IO_RC4 aliases
+#define IO_RC4_TRIS               TRISC4
+#define IO_RC4_LAT                LATC4
+#define IO_RC4_PORT               RC4
+#define IO_RC4_SetHigh()    do { LATC4 = 1; } while(0)
+#define IO_RC4_SetLow()   do { LATC4 = 0; } while(0)
+#define IO_RC4_Toggle()   do { LATC4 = ~LATC4; } while(0)
+#define IO_RC4_GetValue()         RC4
+#define IO_RC4_SetDigitalInput()    do { TRISC4 = 1; } while(0)
+#define IO_RC4_SetDigitalOutput()   do { TRISC4 = 0; } while(0)
+
 // get/set PWM1 aliases
 #define PWM1_TRIS               TRISC5
 #define PWM1_LAT                LATC5
