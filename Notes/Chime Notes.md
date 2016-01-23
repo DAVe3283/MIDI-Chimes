@@ -6,8 +6,10 @@ The keyboard is laid out like such:
 
 ![Picture of the original keyboard for the chimes](old_chime_keyboard.jpg)
 
+```
  G# A#   C# D#   F# G# A#   C# D#   F#
 G  A  B C  D  E F  G  A  B C  D  E F  G
+```
 
 I am not sure which octaves that covers, though. I need to measure the frequency
 of the chimes to be sure.
