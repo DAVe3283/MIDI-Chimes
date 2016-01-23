@@ -28,6 +28,14 @@ strike time leads to a nice clean 4 strikes per second. However, this rate
 _WILL_ require overall thermal management over a rolling 60-second (or so)
 window to protect the coil.
 
+## Using a Teensy instead of PIC
+
+Since we will now be using a Teensy instead of a PIC to PWM the coils, we can
+improve the PWM resolution _and_ frequency at the same time.
+
+On the Teensy, based on [these specs](https://www.pjrc.com/teensy/td_pulse.html),
+it looks like our best bet is 12-bit PWM (0 - 4095) at 8,789.062 Hz with a 72
+MHz CPU clock.
 
 # Thermals
 

@@ -43,17 +43,15 @@
 // Constants
 // -----------------------------------------------------------------------------
 
-
-
 // I2C config
 const uint8_t slave_addresses[] =
 {
-  32,32,32,
-  // 'A', // Slave 0
-  // 'B', // Slave 1
-  // 'C', // Slave 2
+  'A', // Slave 0
+  'B', // Slave 1
+  'C', // Slave 2
 };
 const size_t num_slaves(sizeof(slave_addresses)/sizeof(*slave_addresses));
+// TODO: auto-assignment of slave addresses
 
 // Note mapping
 const size_t notes_per_slave(10);
@@ -62,21 +60,21 @@ const uint8_t note_map[num_slaves][notes_per_slave] =
 {
   // Slave 0
   // G3  G3# A3  A3# B3  C4  C4# D4  D4# E4
-  {  55, 56, 57, 58, 59, 60, 61, 62, 63, 64, },
+  {  55, 56, 57, 58, 59, 60, 61, 62, 63, 64 },
 
   // Slave 1
   // F4  F4# G4  G4# A4  A4# B4  C5  C5# D5
-  {  65, 66, 67, 68, 69, 70, 71, 72, 73, 74, },
+  {  65, 66, 67, 68, 69, 70, 71, 72, 73, 74 },
 
   // Slave 2
   // D5# E5  F5  F5# G5  <--- Not Used --->
-  {  75, 76, 77, 78, 79,  0,  0,  0,  0,  0, },
+  {  75, 76, 77, 78, 79,  0,  0,  0,  0,  0 },
 };
 // TODO: convert this from a reverse-lookup table to a lookup table.
 // It won't be as easy to read, but it will be faster. Or do we need the speed?
+// TODO: use real data once the chimes are hooked up
 
 // Pins
-const uint8_t pwm_pin(3);
 const uint8_t led_pin(13);
 
 // Timeouts
@@ -87,13 +85,20 @@ const uint16_t blink_time(20000); // microseconds
 // Declarations
 // -----------------------------------------------------------------------------
 void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity);
-void OnNoteOff(uint8_t channel, uint8_t note, uint8_t velocity);
+// void OnNoteOff(uint8_t channel, uint8_t note, uint8_t velocity); // Not needed
+// TODO: handle more MIDI stuff?
 // void OnVelocityChange(uint8_t channel, uint8_t note, uint8_t velocity);
 // void OnControlChange(uint8_t channel, uint8_t control, uint8_t value);
 // void OnProgramChange(uint8_t channel, uint8_t program);
 // void OnAfterTouch(uint8_t channel, uint8_t pressure);
 // void OnPitchChange(uint8_t channel, int pitch);
-// TODO: handle more MIDI stuff?
+
+// Scale a MIDI velocity (7-bit) to our 12-bit velocity
+// TODO: calibrate for linear sound output, calibrate per chime, etc.
+uint16_t scale_midi_velocity(const uint8_t& midi_velocity);
+
+// Send a chime strike command to a slave
+void send_chime(const uint8_t& address, const uint8_t& channel, const uint16_t& velocity);
 
 // Gets the slave address and channel on the slave for a given MIDI note
 bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out, uint8_t& slave_channel_out);
@@ -135,7 +140,8 @@ void setup()
 
   // Configure USB MIDI
   usbMIDI.setHandleNoteOn(OnNoteOn);
-  usbMIDI.setHandleNoteOff(OnNoteOff);
+  // usbMIDI.setHandleNoteOff(OnNoteOff); // Not needed
+  // TODO: handle more MIDI stuff?
 }
 
 // Main program loop
@@ -147,48 +153,43 @@ void loop()
 
 void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
 {
-  digitalWrite(led_pin, HIGH); // temp diagnostics
-
   // Are we handling this channel?
   if ((our_channel == 0) || (our_channel == channel))
   {
     // Lookup note
-    uint8_t slave_address;
-    uint8_t slave_channel;
+    uint8_t slave_address, slave_channel;
     if (get_slave_and_channel(note, slave_address, slave_channel))
     {
-      // Send I2C message
-      Wire.beginTransmission(slave_addresses[slave_address]);
-      Wire.write(slave_address);
-      Wire.write(slave_channel);
-      Wire.write(velocity);
-      Wire.endTransmission();
-      // TODO: come up with a protocol
+      send_chime(slave_address, slave_channel, scale_midi_velocity(velocity));
     }
   }
-
-  digitalWrite(led_pin, LOW); // temp diagnostics
 }
 
-void OnNoteOff(uint8_t channel, uint8_t note, uint8_t velocity)
+uint16_t scale_midi_velocity(const uint8_t& midi_velocity)
 {
-  digitalWrite(led_pin, LOW);
-  // ser.print("Note Off! Channel ");
-  // ser.print(channel);
-  // ser.print(" Note: ");
-  // ser.print(note);
-  // ser.print(" Velocity: ");
-  // ser.print(velocity);
-  // ser.println();
+  // TODO: take master volume (& override) into account
+  // TODO: scale MIDI velocity to chime volume somehow
 
-  // Ask for I2C data
-  Wire.requestFrom(slave_addresses[0], 2);
-  uint8_t data;
-  while(Wire.available()) {
-    data = Wire.receive();
-    ser.print("d=0x");
-    ser.println(data, HEX);
-  }
+  return
+    (midi_velocity & 0x7F) // enforce 7-bit requirement (or should I?)
+    << (12 - 7); // Scale from 7-bit to 12-bit
+}
+
+void send_chime(const uint8_t& address, const uint8_t& channel, const uint16_t& velocity)
+{
+  digitalWrite(led_pin, HIGH); // diagnostics
+
+  // Packetize message
+  uint8_t buffer[sizeof(uint8_t) + sizeof(uint16_t)];
+  memcpy(buffer + 0, &channel, sizeof(uint8_t));
+  memcpy(buffer + 1, &velocity, sizeof(uint16_t));
+
+  // Send I2C message
+  Wire.beginTransmission(address);
+  Wire.write(buffer, sizeof(buffer));
+  Wire.endTransmission();
+
+  digitalWrite(led_pin, LOW); // diagnostics
 }
 
 bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out, uint8_t& slave_channel_out)
@@ -199,7 +200,7 @@ bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out,
     {
       if (note_map[slave][channel] == midi_note)
       {
-        slave_address_out = slave;
+        slave_address_out = slave_addresses[slave];
         slave_channel_out = channel;
         return true;
       }

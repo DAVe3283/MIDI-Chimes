@@ -188,7 +188,7 @@ void i2c_receive(int numBytes)
 {
   usb.print("Got ");
   usb.print(numBytes);
-  usb.print(" bytes:");
+  usb.print(" byte(s):");
   for (int i(0); i < numBytes; ++i)
   {
     uint8_t data = Wire.read();
