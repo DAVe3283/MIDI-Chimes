@@ -74,6 +74,12 @@ const uint8_t note_map[num_slaves][notes_per_slave] =
 // It won't be as easy to read, but it will be faster. Or do we need the speed?
 // TODO: use real data once the chimes are hooked up
 
+// Duty Cycle Settings
+const uint8_t pwm_bits(12); // 0 - 4095
+const float minimum_pwm(0.55); // 55%, lowest reliable impact to produce a chime
+const uint16_t maximum_dc((1 << pwm_bits) - 1);
+const uint16_t minimum_dc(minimum_pwm * maximum_dc);
+
 // Pins
 const uint8_t led_pin(13);
 
@@ -130,7 +136,7 @@ HardwareSerial    ser = HardwareSerial();
 void setup()
 {
   // Configure I2C
-  Wire.begin(I2C_MASTER, 0, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_100);
+  Wire.begin(I2C_MASTER, 0, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
 
   // Configure LED
   pinMode(led_pin, OUTPUT);
@@ -153,6 +159,13 @@ void loop()
 
 void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
 {
+  // MIDI spec allows turning a note off by sending a note on with velocity = 0
+  // We don't care about note off ;)
+  if (velocity == 0)
+  {
+    return;
+  }
+
   // Are we handling this channel?
   if ((our_channel == 0) || (our_channel == channel))
   {
@@ -160,7 +173,9 @@ void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
     uint8_t slave_address, slave_channel;
     if (get_slave_and_channel(note, slave_address, slave_channel))
     {
+      digitalWrite(led_pin, HIGH); // diagnostics
       send_chime(slave_address, slave_channel, scale_midi_velocity(velocity));
+      digitalWrite(led_pin, LOW); // diagnostics
     }
   }
 }
@@ -170,15 +185,20 @@ uint16_t scale_midi_velocity(const uint8_t& midi_velocity)
   // TODO: take master volume (& override) into account
   // TODO: scale MIDI velocity to chime volume somehow
 
-  return
-    (midi_velocity & 0x7F) // enforce 7-bit requirement (or should I?)
-    << (12 - 7); // Scale from 7-bit to 12-bit
+  // Don't worry about MIDI velocity == 0, that must be taken care of before we
+  // try and send a message at all.
+
+  // For now, just linearly scaling chime velocity between minimum_dc and
+  // maximum_dc.
+
+  const float requested_velocity(static_cast<float>(midi_velocity & 0x7F) / 127.0);
+  const float range(maximum_dc - minimum_dc);
+  const uint16_t velocity((range * requested_velocity) + minimum_dc);
+  return velocity;
 }
 
 void send_chime(const uint8_t& address, const uint8_t& channel, const uint16_t& velocity)
 {
-  digitalWrite(led_pin, HIGH); // diagnostics
-
   // Packetize message
   uint8_t buffer[sizeof(uint8_t) + sizeof(uint16_t)];
   memcpy(buffer + 0, &channel, sizeof(uint8_t));
@@ -188,8 +208,6 @@ void send_chime(const uint8_t& address, const uint8_t& channel, const uint16_t& 
   Wire.beginTransmission(address);
   Wire.write(buffer, sizeof(buffer));
   Wire.endTransmission();
-
-  digitalWrite(led_pin, LOW); // diagnostics
 }
 
 bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out, uint8_t& slave_channel_out)
