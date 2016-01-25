@@ -30,6 +30,13 @@ the bus speed to something obnoxious.
 
 Notes:
 
+I am planning on using a voltage divider and capacitor to filter the feedback
+voltage from the transistor high-side to verify things are working.
+
+The plan is currently a 160k / 10k divider, with a 1uF capacitor in parallel
+with the 10k resistor. This will let me read 0 - 20.4 volts, and should filter
+the PWM out so I can be lazy with my firmware.
+
 I need external pullup resistors on the I2C bus, as the internal Teensy ones
 don't work all that well. For high speed, I probably want 1.5k or so.
 

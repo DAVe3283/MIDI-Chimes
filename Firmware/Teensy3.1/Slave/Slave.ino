@@ -4,6 +4,16 @@
 // Program for all the slave Teensy units that run the MIDI chimes coils.
 // Each slave is responsible for running a number of chimes, and keeping them
 // from overheating.
+//
+// TODO:
+// * log errors
+// * report status to master
+// * measure voltages (on demand? between strikes?)
+// * diagnose transistors
+//   * verify voltage is high when PWM is off (@ bootup?)
+//   * verify voltage is low halfway through strike time
+//   * verify voltage is high halfway through settle time
+//   * be able to handle the powersupply being turned off to save power
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
@@ -22,20 +32,31 @@ const uint8_t i2c_address('A');
 // PWM pins used by the chime coils
 const uint8_t chime_pins[] =
 {
-   3,
-   4,
-   5,
-   6,
-   9,
-  10,
-  20,
-  21,
-  22,
-  23,
+   3, // Channel 0
+   4, // Channel 1
+   5, // Channel 2
+   6, // Channel 3
+   9, // Channel 4
+  10, // Channel 5
+  23, // Channel 6
+  22, // Channel 7
+  21, // Channel 8
 };
-
 const uint8_t num_channels(sizeof(chime_pins) / sizeof(*chime_pins));
-//const uint8_t pwm_pin(3); // DELETE ME
+
+// Analog pins used for feedback
+const uint8_t feedback_pins[num_channels] =
+{
+   A0, // Channel 0 (pin 14)
+   A1, // Channel 1 (pin 15)
+   A2, // Channel 2 (pin 16)
+   A3, // Channel 3 (pin 17)
+   A4, // Channel 4 (pin 18)
+   A5, // Channel 5 (pin 19)
+   A6, // Channel 6 (pin 20)
+  A10, // Channel 7 (on back)
+  A11, // Channel 8 (on back)
+};
 
 const uint8_t led_pin(13);
 
@@ -46,7 +67,16 @@ const uint16_t blink_time(20000); // microseconds
 
 // PWM Config
 const uint8_t pwm_bits(12);
-const uint32_t pwm_freq(8789);
+const uint32_t pwm_freq(8789); // Hz
+
+// Voltage Divider
+// I am using a divider of 160k and 10k, giving (160k+10k):10k, or 17:1.
+const float divider_ratio(17.0);
+// We are using the Teensy's 1.2V stable internal reference for better accuracy.
+// That means we can read 0 - 20.4 volts.
+
+// We can do a 13-bit read on the Teensy 3.1 & 3.2
+const uint8_t analog_read_bits(13);
 
 
 // -----------------------------------------------------------------------------
@@ -70,6 +100,9 @@ void i2c_requested();
 // Strike a chime (handles thermals, settle time, etc.)
 void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle);
 
+// Read the voltage on the given channel
+float read_voltage(const uint8_t& channel);
+
 // -----------------------------------------------------------------------------
 // Globals
 // -----------------------------------------------------------------------------
@@ -90,6 +123,9 @@ int8_t strikes_remaining[num_channels];
 
 // Strike chime variables
 bool strike(false);
+
+// Measured coil voltages at startup (testing)
+float startup_voltage[num_channels];
 
 
 // -----------------------------------------------------------------------------
@@ -119,6 +155,16 @@ void setup()
     analogWrite(chime_pins[channel], 0); // Off
     striking[channel] = false;
     strikes_remaining[channel] = max_strikes;
+  }
+
+  // Configure analog inputs
+  analogReadResolution(analog_read_bits);
+  analogReference(INTERNAL); // Set reference voltage to 1.2V
+
+  // Measure startup voltages (testing)
+  for (int channel(0); channel < num_channels; ++channel)
+  {
+    startup_voltage[channel] = read_voltage(channel);
   }
 }
 
@@ -168,6 +214,19 @@ void loop()
 
     switch (incomingByte)
     {
+    case '\r':
+      usb.println();
+      // Testing
+      for (int channel(0); channel < num_channels; ++channel)
+      {
+        usb.print("Channel ");
+        usb.print(channel);
+        usb.print(" measured ");
+        usb.print(startup_voltage[channel]);
+        usb.println("V at startup.");
+      }
+      break;
+
     default:
       // Echo unknown commands (sanity check the serial link)
       usb.print(incomingByte);
@@ -219,6 +278,18 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
   usb.print((1 << pwm_bits) - 1);
   usb.println(")");
 
+  // Verify channel is sane (prevent buffer overflow)
+  if (channel >= num_channels)
+  {
+    usb.print("We only have ");
+    usb.print(num_channels, DEC);
+    usb.print(" channels (0 - ");
+    usb.print(num_channels - 1, DEC);
+    usb.println("), ignoring this request!");
+    // TODO: log error?
+    return;
+  }
+
   // Verify we are not already striking the chime, and the settle has completed
   if (!striking[channel] && (strike_timer[channel] >= settle_time))
   {
@@ -247,4 +318,15 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
     usb.print(channel, DEC);
     usb.println("! Skipped strike.");
   }
+}
+
+float read_voltage(const uint8_t& channel)
+{
+  const float analog_raw(analogRead(feedback_pins[channel]));
+  const float analog_max((1 << analog_read_bits) - 1);
+  float voltage
+    = 1.2 // reference voltage
+    * divider_ratio // times the divider
+    * analog_raw / analog_max; // times the measured ratio
+  return voltage;
 }
