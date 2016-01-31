@@ -32,30 +32,33 @@ const uint8_t i2c_address('A');
 // PWM pins used by the chime coils
 const uint8_t chime_pins[] =
 {
-   3, // Channel 0
-   4, // Channel 1
-   5, // Channel 2
-   6, // Channel 3
-   9, // Channel 4
-  10, // Channel 5
-  23, // Channel 6
-  22, // Channel 7
+   3, // Channel 1
+   4, // Channel 2
+   5, // Channel 3
+   6, // Channel 4
+   9, // Channel 5
+  10, // Channel 6
+  20, // Channel 7
   21, // Channel 8
+  22, // Channel 9
+  23, // Channel 10
 };
 const uint8_t num_channels(sizeof(chime_pins) / sizeof(*chime_pins));
 
 // Analog pins used for feedback
 const uint8_t feedback_pins[num_channels] =
 {
-   A0, // Channel 0 (pin 14)
-   A1, // Channel 1 (pin 15)
-   A2, // Channel 2 (pin 16)
-   A3, // Channel 3 (pin 17)
-   A4, // Channel 4 (pin 18)
-   A5, // Channel 5 (pin 19)
-   A6, // Channel 6 (pin 20)
-  A10, // Channel 7 (on back)
-  A11, // Channel 8 (on back)
+   A0, // Channel 1 (pin 14)
+   A1, // Channel 2 (pin 15)
+   A2, // Channel 3 (pin 16)
+   A3, // Channel 4 (pin 17)
+       // Pins 18-19 are I2C!
+  A15, // Channel 5 (on back)
+  A16, // Channel 6 (on back)
+  A17, // Channel 7 (on back)
+  A18, // Channel 8 (on back)
+  A19, // Channel 9 (on back)
+  A20, // Channel 10 (on back)
 };
 
 const uint8_t led_pin(13);

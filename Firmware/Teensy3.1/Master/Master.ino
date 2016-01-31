@@ -54,21 +54,21 @@ const size_t num_slaves(sizeof(slave_addresses)/sizeof(*slave_addresses));
 // TODO: auto-assignment of slave addresses
 
 // Note mapping
-const size_t notes_per_slave(9);
+const size_t notes_per_slave(10);
 // WARNING: make sure this table is big enough!
 const uint8_t note_map[num_slaves][notes_per_slave] =
 {
   // Slave 0
-  // G3  G3# A3  A3# B3  C4  C4# D4  D4#
-  {  55, 56, 57, 58, 59, 60, 61, 62, 63 },
+  // G3  G3# A3  A3# B3  C4  C4# D4  D4# E4
+  {  55, 56, 57, 58, 59, 60, 61, 62, 63, 64 },
 
   // Slave 1
-  // E4  F4  F4# G4  G4# A4  A4# B4  C5
-  {  64, 65, 66, 67, 68, 69, 70, 71, 72 },
+  // F4  F4# G4  G4# A4  A4# B4  C5  C5# D5
+  {  65, 66, 67, 68, 69, 70, 71, 72, 73, 74 },
 
   // Slave 2
-  // C5# D5  D5# E5  F5  F5# G5  < N/A >
-  {  73, 74, 75, 76, 77, 78, 79,  0,  0 },
+  // D5# E5  F5  F5# G5  <--- Not Used --->
+  {  75, 76, 77, 78, 79,  0,  0,  0,  0,  0 },
 };
 // TODO: convert this from a reverse-lookup table to a lookup table.
 // It won't be as easy to read, but it will be faster. Or do we need the speed?

@@ -28,6 +28,26 @@ the bus speed to something obnoxious.
 
 ## Schematics
 
+See the "PCB & Schematic" directory.
+
+### Data Connector Pinout
+
+| Pin |  Description  |
+| --- | ------------- |
+|   1 | Ground        |
+|   2 | +5V_SB        |
+|   3 | I2C SCL       |
+|   4 | I2C SDA       |
+|   5 | Address Latch |
+|   6 | PS_EN         |
+
++5V_SB is 5V standby power from the PSU.
+PS_EN is the power supply enable line.
+Address latch is used to auto-assign I2C addresses on startup (future use).
+
+If I did this right, no magic smoke should escape if (when) someone plugs this
+connector in backwards. Off-by-one... not so much.
+
 Notes:
 
 I am planning on using a voltage divider and capacitor to filter the feedback
@@ -42,7 +62,11 @@ don't work all that well. For high speed, I probably want 1.5k or so.
 
 MIDI uses an opto-isolator. I should pick up some 6N138 opto-isolators.
 
-TODO
+http://www.mouser.com/ProductDetail/Molex/15-91-2140/?qs=sGAEpiMZZMttdt6ek4ZYDGcRuHgvKenX
+    This is for the pads on the back of the Teensy.
+
+I think I can use the MAB5SH part in Eagle as the footprint for the MIDI conenctor.
+    Yeah, I think we're good. But just in case: http://www.newark.com/hirschmann/mab-5-sh/din-audio-video-connector-socket/dp/61T4646
 
 ## License
 
