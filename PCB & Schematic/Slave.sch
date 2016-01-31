@@ -8,20 +8,20 @@
 </settings>
 <grid distance="0.1" unitdist="inch" unit="inch" style="lines" multiple="1" display="no" altdistance="0.01" altunitdist="inch" altunit="inch"/>
 <layers>
-<layer number="1" name="Top" color="4" fill="1" visible="no" active="no"/>
-<layer number="16" name="Bottom" color="1" fill="1" visible="no" active="no"/>
-<layer number="17" name="Pads" color="2" fill="1" visible="no" active="no"/>
-<layer number="18" name="Vias" color="2" fill="1" visible="no" active="no"/>
-<layer number="19" name="Unrouted" color="6" fill="1" visible="no" active="no"/>
-<layer number="20" name="Dimension" color="15" fill="1" visible="no" active="no"/>
-<layer number="21" name="tPlace" color="7" fill="1" visible="no" active="no"/>
-<layer number="22" name="bPlace" color="7" fill="1" visible="no" active="no"/>
-<layer number="23" name="tOrigins" color="15" fill="1" visible="no" active="no"/>
-<layer number="24" name="bOrigins" color="15" fill="1" visible="no" active="no"/>
-<layer number="25" name="tNames" color="7" fill="1" visible="no" active="no"/>
-<layer number="26" name="bNames" color="7" fill="1" visible="no" active="no"/>
-<layer number="27" name="tValues" color="7" fill="1" visible="no" active="no"/>
-<layer number="28" name="bValues" color="7" fill="1" visible="no" active="no"/>
+<layer number="1" name="Top" color="4" fill="1" visible="yes" active="no"/>
+<layer number="16" name="Bottom" color="1" fill="1" visible="yes" active="no"/>
+<layer number="17" name="Pads" color="2" fill="1" visible="yes" active="no"/>
+<layer number="18" name="Vias" color="2" fill="1" visible="yes" active="no"/>
+<layer number="19" name="Unrouted" color="6" fill="1" visible="yes" active="no"/>
+<layer number="20" name="Dimension" color="15" fill="1" visible="yes" active="no"/>
+<layer number="21" name="tPlace" color="7" fill="1" visible="yes" active="no"/>
+<layer number="22" name="bPlace" color="7" fill="1" visible="yes" active="no"/>
+<layer number="23" name="tOrigins" color="15" fill="1" visible="yes" active="no"/>
+<layer number="24" name="bOrigins" color="15" fill="1" visible="yes" active="no"/>
+<layer number="25" name="tNames" color="7" fill="1" visible="yes" active="no"/>
+<layer number="26" name="bNames" color="7" fill="1" visible="yes" active="no"/>
+<layer number="27" name="tValues" color="7" fill="1" visible="yes" active="no"/>
+<layer number="28" name="bValues" color="7" fill="1" visible="yes" active="no"/>
 <layer number="29" name="tStop" color="7" fill="3" visible="no" active="no"/>
 <layer number="30" name="bStop" color="7" fill="6" visible="no" active="no"/>
 <layer number="31" name="tCream" color="7" fill="4" visible="no" active="no"/>
@@ -30,8 +30,8 @@
 <layer number="34" name="bFinish" color="6" fill="6" visible="no" active="no"/>
 <layer number="35" name="tGlue" color="7" fill="4" visible="no" active="no"/>
 <layer number="36" name="bGlue" color="7" fill="5" visible="no" active="no"/>
-<layer number="37" name="tTest" color="7" fill="1" visible="no" active="no"/>
-<layer number="38" name="bTest" color="7" fill="1" visible="no" active="no"/>
+<layer number="37" name="tTest" color="7" fill="1" visible="yes" active="no"/>
+<layer number="38" name="bTest" color="7" fill="1" visible="yes" active="no"/>
 <layer number="39" name="tKeepout" color="4" fill="11" visible="no" active="no"/>
 <layer number="40" name="bKeepout" color="1" fill="11" visible="no" active="no"/>
 <layer number="41" name="tRestrict" color="4" fill="10" visible="no" active="no"/>
@@ -39,12 +39,12 @@
 <layer number="43" name="vRestrict" color="2" fill="10" visible="no" active="no"/>
 <layer number="44" name="Drills" color="7" fill="1" visible="no" active="no"/>
 <layer number="45" name="Holes" color="7" fill="1" visible="no" active="no"/>
-<layer number="46" name="Milling" color="3" fill="1" visible="no" active="no"/>
-<layer number="47" name="Measures" color="7" fill="1" visible="no" active="no"/>
-<layer number="48" name="Document" color="7" fill="1" visible="no" active="no"/>
-<layer number="49" name="Reference" color="7" fill="1" visible="no" active="no"/>
-<layer number="51" name="tDocu" color="14" fill="1" visible="no" active="no"/>
-<layer number="52" name="bDocu" color="7" fill="1" visible="no" active="no"/>
+<layer number="46" name="Milling" color="3" fill="1" visible="yes" active="no"/>
+<layer number="47" name="Measures" color="7" fill="1" visible="yes" active="no"/>
+<layer number="48" name="Document" color="7" fill="1" visible="yes" active="no"/>
+<layer number="49" name="Reference" color="7" fill="1" visible="yes" active="no"/>
+<layer number="51" name="tDocu" color="14" fill="1" visible="yes" active="no"/>
+<layer number="52" name="bDocu" color="7" fill="1" visible="yes" active="no"/>
 <layer number="90" name="Modules" color="5" fill="1" visible="yes" active="yes"/>
 <layer number="91" name="Nets" color="2" fill="1" visible="yes" active="yes"/>
 <layer number="92" name="Busses" color="1" fill="1" visible="yes" active="yes"/>
@@ -7646,54 +7646,54 @@ Spade Connector</description>
 <part name="AGND1" library="supply1" deviceset="AGND" device=""/>
 <part name="GND3" library="supply1" deviceset="GND" device=""/>
 <part name="P+1" library="supply1" deviceset="+5V" device=""/>
-<part name="T1" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220" value="2N6387G"/>
+<part name="T1" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220V" value="2N6387G"/>
 <part name="R3" library="resistor" deviceset="R-US_" device="R0805" value="160k"/>
 <part name="R4" library="resistor" deviceset="R-US_" device="R0805" value="10k"/>
 <part name="C2" library="resistor" deviceset="C-US" device="C0805" value="1u"/>
 <part name="GND2" library="supply1" deviceset="GND" device=""/>
-<part name="T2" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220" value="2N6387G"/>
+<part name="T2" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220V" value="2N6387G"/>
 <part name="R5" library="resistor" deviceset="R-US_" device="R0805" value="160k"/>
 <part name="R6" library="resistor" deviceset="R-US_" device="R0805" value="10k"/>
 <part name="C3" library="resistor" deviceset="C-US" device="C0805" value="1u"/>
 <part name="GND4" library="supply1" deviceset="GND" device=""/>
-<part name="T3" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220" value="2N6387G"/>
+<part name="T3" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220V" value="2N6387G"/>
 <part name="R7" library="resistor" deviceset="R-US_" device="R0805" value="160k"/>
 <part name="R8" library="resistor" deviceset="R-US_" device="R0805" value="10k"/>
 <part name="C4" library="resistor" deviceset="C-US" device="C0805" value="1u"/>
 <part name="GND5" library="supply1" deviceset="GND" device=""/>
-<part name="T4" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220" value="2N6387G"/>
+<part name="T4" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220V" value="2N6387G"/>
 <part name="R9" library="resistor" deviceset="R-US_" device="R0805" value="160k"/>
 <part name="R10" library="resistor" deviceset="R-US_" device="R0805" value="10k"/>
 <part name="C5" library="resistor" deviceset="C-US" device="C0805" value="1u"/>
 <part name="GND6" library="supply1" deviceset="GND" device=""/>
-<part name="T5" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220" value="2N6387G"/>
+<part name="T5" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220V" value="2N6387G"/>
 <part name="R11" library="resistor" deviceset="R-US_" device="R0805" value="160k"/>
 <part name="R12" library="resistor" deviceset="R-US_" device="R0805" value="10k"/>
 <part name="C6" library="resistor" deviceset="C-US" device="C0805" value="1u"/>
 <part name="GND7" library="supply1" deviceset="GND" device=""/>
-<part name="T6" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220" value="2N6387G"/>
+<part name="T6" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220V" value="2N6387G"/>
 <part name="R13" library="resistor" deviceset="R-US_" device="R0805" value="160k"/>
 <part name="R14" library="resistor" deviceset="R-US_" device="R0805" value="10k"/>
 <part name="C7" library="resistor" deviceset="C-US" device="C0805" value="1u"/>
 <part name="GND8" library="supply1" deviceset="GND" device=""/>
-<part name="T7" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220" value="2N6387G"/>
+<part name="T7" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220V" value="2N6387G"/>
 <part name="R15" library="resistor" deviceset="R-US_" device="R0805" value="160k"/>
 <part name="R16" library="resistor" deviceset="R-US_" device="R0805" value="10k"/>
 <part name="C8" library="resistor" deviceset="C-US" device="C0805" value="1u"/>
 <part name="GND9" library="supply1" deviceset="GND" device=""/>
-<part name="T8" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220" value="2N6387G"/>
+<part name="T8" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220V" value="2N6387G"/>
 <part name="R17" library="resistor" deviceset="R-US_" device="R0805" value="160k"/>
 <part name="R18" library="resistor" deviceset="R-US_" device="R0805" value="10k"/>
 <part name="C9" library="resistor" deviceset="C-US" device="C0805" value="1u"/>
 <part name="GND10" library="supply1" deviceset="GND" device=""/>
-<part name="T9" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220" value="2N6387G"/>
+<part name="T9" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220V" value="2N6387G"/>
 <part name="U$1" library="Teensy_3_and_LC_Series_Boards_v1.1" deviceset="TEENSY_3.1_ALL_PINS_AND_PADS" device=""/>
 <part name="R21" library="resistor" deviceset="R-US_" device="R0805" value="0"/>
 <part name="R19" library="resistor" deviceset="R-US_" device="R0805" value="160k"/>
 <part name="R20" library="resistor" deviceset="R-US_" device="R0805" value="10k"/>
 <part name="C10" library="resistor" deviceset="C-US" device="C0805" value="1u"/>
 <part name="GND11" library="supply1" deviceset="GND" device=""/>
-<part name="T10" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220" value="2N6387G"/>
+<part name="T10" library="transistor-neu-to92" deviceset="*-NPN-" device="TO220V" value="2N6387G"/>
 <part name="SV1" library="con-lstb" deviceset="MA06-1" device="" value="Input"/>
 <part name="SV2" library="con-lstb" deviceset="MA06-1" device="" value="Output"/>
 <part name="GND13" library="supply1" deviceset="GND" device=""/>
@@ -7718,7 +7718,7 @@ Spade Connector</description>
 <instance part="R2" gate="G$1" x="147.32" y="129.54" rot="R90"/>
 <instance part="C1" gate="G$1" x="154.94" y="132.08"/>
 <instance part="GND1" gate="1" x="132.08" y="119.38"/>
-<instance part="AGND1" gate="VR1" x="76.2" y="58.42"/>
+<instance part="AGND1" gate="VR1" x="88.9" y="58.42"/>
 <instance part="GND3" gate="1" x="76.2" y="71.12"/>
 <instance part="P+1" gate="1" x="76.2" y="101.6"/>
 <instance part="T1" gate="G$1" x="129.54" y="129.54"/>
@@ -7941,7 +7941,7 @@ Spade Connector</description>
 <junction x="-12.7" y="45.72"/>
 </segment>
 </net>
-<net name="N$1" class="0">
+<net name="HS1" class="0">
 <segment>
 <pinref part="R1" gate="G$1" pin="1"/>
 <pinref part="T1" gate="G$1" pin="C"/>
@@ -7965,12 +7965,12 @@ Spade Connector</description>
 <label x="154.94" y="137.16" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="U$1" gate="G$1" pin="14/A0"/>
-<wire x1="20.32" y1="48.26" x2="5.08" y2="48.26" width="0.1524" layer="91"/>
-<label x="5.08" y="48.26" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="A12"/>
+<wire x1="66.04" y1="53.34" x2="81.28" y2="53.34" width="0.1524" layer="91"/>
+<label x="66.04" y="53.34" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$3" class="0">
+<net name="HS2" class="0">
 <segment>
 <pinref part="R3" gate="G$1" pin="1"/>
 <pinref part="T2" gate="G$1" pin="C"/>
@@ -7994,12 +7994,12 @@ Spade Connector</description>
 <label x="154.94" y="114.3" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="U$1" gate="G$1" pin="15/A1/T"/>
-<wire x1="20.32" y1="45.72" x2="5.08" y2="45.72" width="0.1524" layer="91"/>
-<label x="5.08" y="45.72" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="26/A15"/>
+<wire x1="66.04" y1="25.4" x2="81.28" y2="25.4" width="0.1524" layer="91"/>
+<label x="66.04" y="25.4" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$5" class="0">
+<net name="HS3" class="0">
 <segment>
 <pinref part="R5" gate="G$1" pin="1"/>
 <pinref part="T3" gate="G$1" pin="C"/>
@@ -8023,12 +8023,12 @@ Spade Connector</description>
 <label x="154.94" y="91.44" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="U$1" gate="G$1" pin="16/A2/T"/>
-<wire x1="20.32" y1="43.18" x2="5.08" y2="43.18" width="0.1524" layer="91"/>
-<label x="5.08" y="43.18" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="27/A16"/>
+<wire x1="66.04" y1="27.94" x2="81.28" y2="27.94" width="0.1524" layer="91"/>
+<label x="66.04" y="27.94" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$7" class="0">
+<net name="HS4" class="0">
 <segment>
 <pinref part="R7" gate="G$1" pin="1"/>
 <pinref part="T4" gate="G$1" pin="C"/>
@@ -8052,12 +8052,12 @@ Spade Connector</description>
 <label x="154.94" y="68.58" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="U$1" gate="G$1" pin="17/A3/T"/>
-<wire x1="20.32" y1="40.64" x2="5.08" y2="40.64" width="0.1524" layer="91"/>
-<label x="5.08" y="40.64" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="28/A17"/>
+<wire x1="66.04" y1="30.48" x2="81.28" y2="30.48" width="0.1524" layer="91"/>
+<label x="66.04" y="30.48" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$9" class="0">
+<net name="HS5" class="0">
 <segment>
 <pinref part="R9" gate="G$1" pin="1"/>
 <pinref part="T5" gate="G$1" pin="C"/>
@@ -8081,12 +8081,12 @@ Spade Connector</description>
 <label x="154.94" y="43.18" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="U$1" gate="G$1" pin="26/A15"/>
-<wire x1="66.04" y1="25.4" x2="81.28" y2="25.4" width="0.1524" layer="91"/>
-<label x="66.04" y="25.4" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="A14/DAC"/>
+<wire x1="66.04" y1="58.42" x2="81.28" y2="58.42" width="0.1524" layer="91"/>
+<label x="66.04" y="58.42" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$11" class="0">
+<net name="HS6" class="0">
 <segment>
 <pinref part="R11" gate="G$1" pin="1"/>
 <pinref part="T6" gate="G$1" pin="C"/>
@@ -8110,12 +8110,12 @@ Spade Connector</description>
 <label x="154.94" y="17.78" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="U$1" gate="G$1" pin="27/A16"/>
-<wire x1="66.04" y1="27.94" x2="81.28" y2="27.94" width="0.1524" layer="91"/>
-<label x="66.04" y="27.94" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="14/A0"/>
+<wire x1="20.32" y1="48.26" x2="5.08" y2="48.26" width="0.1524" layer="91"/>
+<label x="5.08" y="48.26" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$13" class="0">
+<net name="HS7" class="0">
 <segment>
 <pinref part="R13" gate="G$1" pin="1"/>
 <pinref part="T7" gate="G$1" pin="C"/>
@@ -8139,12 +8139,12 @@ Spade Connector</description>
 <label x="154.94" y="-5.08" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="U$1" gate="G$1" pin="28/A17"/>
-<wire x1="66.04" y1="30.48" x2="81.28" y2="30.48" width="0.1524" layer="91"/>
-<label x="66.04" y="30.48" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="15/A1/T"/>
+<wire x1="20.32" y1="45.72" x2="5.08" y2="45.72" width="0.1524" layer="91"/>
+<label x="5.08" y="45.72" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$15" class="0">
+<net name="HS8" class="0">
 <segment>
 <pinref part="R15" gate="G$1" pin="1"/>
 <pinref part="T8" gate="G$1" pin="C"/>
@@ -8168,12 +8168,12 @@ Spade Connector</description>
 <label x="154.94" y="-27.94" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="U$1" gate="G$1" pin="29/A18/SCL1"/>
-<wire x1="66.04" y1="33.02" x2="81.28" y2="33.02" width="0.1524" layer="91"/>
-<label x="66.04" y="33.02" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="16/A2/T"/>
+<wire x1="20.32" y1="43.18" x2="5.08" y2="43.18" width="0.1524" layer="91"/>
+<label x="5.08" y="43.18" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="N$17" class="0">
+<net name="HS9" class="0">
 <segment>
 <pinref part="R17" gate="G$1" pin="1"/>
 <pinref part="T9" gate="G$1" pin="C"/>
@@ -8197,9 +8197,9 @@ Spade Connector</description>
 <label x="154.94" y="-50.8" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="U$1" gate="G$1" pin="30/A19/SDA1"/>
-<wire x1="66.04" y1="35.56" x2="81.28" y2="35.56" width="0.1524" layer="91"/>
-<label x="66.04" y="35.56" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="17/A3/T"/>
+<wire x1="20.32" y1="40.64" x2="5.08" y2="40.64" width="0.1524" layer="91"/>
+<label x="5.08" y="40.64" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="CHIME1" class="0">
@@ -8333,14 +8333,14 @@ Spade Connector</description>
 <pinref part="U$1" gate="G$1" pin="AGND"/>
 <pinref part="AGND1" gate="VR1" pin="AGND"/>
 <wire x1="66.04" y1="63.5" x2="71.12" y2="63.5" width="0.1524" layer="91"/>
-<wire x1="71.12" y1="63.5" x2="76.2" y2="63.5" width="0.1524" layer="91"/>
-<wire x1="76.2" y1="63.5" x2="76.2" y2="60.96" width="0.1524" layer="91"/>
+<wire x1="71.12" y1="63.5" x2="88.9" y2="63.5" width="0.1524" layer="91"/>
+<wire x1="88.9" y1="63.5" x2="88.9" y2="60.96" width="0.1524" layer="91"/>
 <pinref part="R21" gate="G$1" pin="1"/>
 <wire x1="71.12" y1="66.04" x2="71.12" y2="63.5" width="0.1524" layer="91"/>
 <junction x="71.12" y="63.5"/>
 </segment>
 </net>
-<net name="N$2" class="0">
+<net name="HS10" class="0">
 <segment>
 <pinref part="R19" gate="G$1" pin="1"/>
 <pinref part="T10" gate="G$1" pin="C"/>
@@ -8364,9 +8364,9 @@ Spade Connector</description>
 <label x="154.94" y="-73.66" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="U$1" gate="G$1" pin="31/A20"/>
-<wire x1="66.04" y1="38.1" x2="81.28" y2="38.1" width="0.1524" layer="91"/>
-<label x="66.04" y="38.1" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="30/A19/SDA1"/>
+<wire x1="66.04" y1="35.56" x2="81.28" y2="35.56" width="0.1524" layer="91"/>
+<label x="66.04" y="35.56" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="CHIME10" class="0">
@@ -8443,6 +8443,13 @@ Spade Connector</description>
 </nets>
 </sheet>
 </sheets>
+<errors>
+<approved hash="104,1,66.04,83.82,U$1,VIN,+5V,,,"/>
+<approved hash="204,1,66.04,81.28,U$1,3.3V,,,,"/>
+<approved hash="204,1,66.04,78.74,U$1,VBAT,,,,"/>
+<approved hash="204,1,66.04,66.04,U$1,AREF,,,,"/>
+<approved hash="204,1,66.04,86.36,U$1,VUSB,,,,"/>
+</errors>
 </schematic>
 </drawing>
 </eagle>
