@@ -120,20 +120,25 @@ elapsedMillis cooldown_timer;
 elapsedMillis strike_timer[num_channels];
 elapsedMicros message_blink_timer;
 
-// Serial IO
+// USB Debug
 usb_serial_class  usb = usb_serial_class();
+bool debug(false);
 
 // Are we striking currently?
-bool striking[num_channels];
+volatile bool striking[num_channels];
+
+// What Duty Cycle (%) are we commanding for the channel?
+volatile float set_dc[num_channels];
+
+// Have we verified the voltage is reasonable (coil & transistor are working)?
+volatile bool verified[num_channels];
 
 // Thermal load limiter
-int8_t strikes_remaining[num_channels];
+volatile int8_t strikes_remaining[num_channels];
 
-// Strike chime variables
-bool strike(false);
-
-// Measured coil voltages at startup (testing)
-float startup_voltage[num_channels];
+// Power supply measurements
+float ps_voltage[num_channels]; // Last measured voltage
+float ps_setpoint(0); // Guess power supply setpoint (max measured voltage at startup)
 
 
 // -----------------------------------------------------------------------------
@@ -150,6 +155,9 @@ void setup()
   Wire.begin(I2C_SLAVE, i2c_address, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
   Wire.onReceive(i2c_receive);
   Wire.onRequest(i2c_requested);
+
+  // High-Z the PS_Enable pin
+  pinMode(ps_enable_pin, INPUT);
 
   // Configure LED
   pinMode(led_pin, OUTPUT);
@@ -169,11 +177,18 @@ void setup()
   analogReadResolution(analog_read_bits);
   analogReference(INTERNAL); // Set reference voltage to 1.2V
 
-  // Measure startup voltages (testing)
+  // Measure power supply voltages at boot
+  // TODO: do we need to wait for the power supply to settle?
   for (int channel(0); channel < num_channels; ++channel)
   {
-    startup_voltage[channel] = read_voltage(channel);
+    const float voltage(read_voltage(channel));
+    ps_voltage[channel] = voltage;
+    if (voltage > ps_setpoint)
+    {
+      ps_setpoint = voltage;
+    }
   }
+  // TODO: determine which channels are not used (0 voltage) vs stuck (low non-zero voltage)
 }
 
 // Main program loop
@@ -183,6 +198,7 @@ void loop()
   if (cooldown_timer >= cooldown_period)
   {
     cooldown_timer -= cooldown_period;
+    noInterrupts(); // strikes_remaining can change inside the I2C ISR
     for (int channel(0); channel < num_channels; ++channel)
     {
       // Allow an additional strike (up to max_strikes)
@@ -191,18 +207,80 @@ void loop()
         strikes_remaining[channel]++;
       }
     }
+    interrupts(); // re-enable ISR
   }
 
-  // Stop strike after timeout
+  // Handle strike and voltage measurement
+  noInterrupts(); // striking, verified, & strike_timer can change inside the I2C ISR
   for (int channel(0); channel < num_channels; ++channel)
   {
-    if (striking[channel] && (strike_timer[channel] >= strike_time))
+    if (striking[channel])
     {
-      striking[channel] = false; // We are no longer striking
-      strike_timer[channel] = 0; // Start settle timer
-      analogWrite(chime_pins[channel], 0); // Turn off PWM
+      // Measure feedback voltage halfway through strike time
+      if (!verified[channel] && (strike_timer[channel] >= (strike_time / 2)))
+      {
+        const float voltage(read_voltage(channel));
+        const float ideal_voltage(ps_setpoint * set_dc[channel]);
+        const float error((ideal_voltage - voltage) / ps_setpoint);
+        // TODO: log/report failures here
+        verified[channel] = true;
+        if (debug)
+        {
+          usb.print("Verifying channel ");
+          usb.print(channel + 1);
+          usb.println(" during strike:");
+          usb.print("    Ideal voltage: ");
+          usb.print(ideal_voltage);
+          usb.println("V");
+          usb.print("    Measured voltage: ");
+          usb.print(voltage);
+          usb.println("V");
+          usb.print("    Error: ");
+          usb.print(error * 100.0);
+          usb.println("%");
+        }
+      }
+
+      // Stop strike after timeout
+      if (strike_timer[channel] >= strike_time)
+      {
+        striking[channel] = false; // We are no longer striking
+        verified[channel] = false; // We need to verify it turns off
+        strike_timer[channel] = 0; // Start settle timer
+        analogWrite(chime_pins[channel], 0); // Turn off PWM
+      }
+    }
+    else
+    {
+      // Measure power supply voltage at the end of settle time
+      // Note: Theoretical risk of missing this measurement if a strike is
+      //       commanded exactly as settle time runs out, and we missed it on
+      //       the previous pass through. But we don't care
+      if (!verified[channel] && (strike_timer[channel] >= settle_time))
+      {
+        ps_voltage[channel] = read_voltage(channel);
+        const float error((ps_setpoint - ps_voltage[channel]) / ps_setpoint);
+        // TODO: log/report failures here
+        verified[channel] = true;
+        if (debug)
+        {
+          usb.print("Verifying channel ");
+          usb.print(channel + 1);
+          usb.println(" after settle:");
+          usb.print("    ps_setpoint: ");
+          usb.print(ps_setpoint);
+          usb.println("V");
+          usb.print("    Measured voltage: ");
+          usb.print(ps_voltage[channel]);
+          usb.println("V");
+          usb.print("    Error: ");
+          usb.print(error * 100.0);
+          usb.println("%");
+        }
+      }
     }
   }
+  interrupts(); // re-enable ISR
 
   // Blink LED on I/O traffic
   if (message_blink_timer >= blink_time)
@@ -214,11 +292,18 @@ void loop()
     digitalWrite(led_pin, HIGH);
   }
 
-  // Handle USB I/O
+  // USB Debug
   if (usb.available() > 0)
   {
     const char incomingByte(static_cast<char>(usb.read()));
     message_blink_timer = 0;
+
+    // Enable debug mode
+    if (!debug)
+    {
+      debug = true;
+      usb.println("Enabled USB debug output.");
+    }
 
     switch (incomingByte)
     {
@@ -228,11 +313,14 @@ void loop()
       for (int channel(0); channel < num_channels; ++channel)
       {
         usb.print("Channel ");
-        usb.print(channel);
-        usb.print(" measured ");
-        usb.print(startup_voltage[channel]);
-        usb.println("V at startup.");
+        usb.print(channel + 1);
+        usb.print(" last measured ");
+        usb.print(ps_voltage[channel]);
+        usb.println("V.");
       }
+      usb.print("Power supply voltage setpoint estimated to be ");
+      usb.print(ps_setpoint);
+      usb.println("V.");
       break;
 
     default:
@@ -274,29 +362,33 @@ void i2c_requested()
 
 void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
 {
-  // Diag: spit out the results
-  float dc = static_cast<float>(duty_cycle) / static_cast<float>((1 << pwm_bits) - 1) * 100.0;
-  usb.print("Got strike command for channel ");
-  usb.print(channel, DEC);
-  usb.print(", PWM Duty Cycle: ");
-  usb.print(dc);
-  usb.print("% (");
-  usb.print(duty_cycle);
-  usb.print("/");
-  usb.print((1 << pwm_bits) - 1);
-  usb.println(")");
+  float dc = static_cast<float>(duty_cycle) / static_cast<float>((1 << pwm_bits) - 1);
+  if (debug)
+  {
+    usb.print("Got strike command for channel ");
+    usb.print(channel + 1, DEC);
+    usb.print(", PWM Duty Cycle: ");
+    usb.print(dc * 100.0);
+    usb.print("% (");
+    usb.print(duty_cycle);
+    usb.print("/");
+    usb.print((1 << pwm_bits) - 1);
+    usb.println(")");
+  }
 
   // Verify channel is sane (prevent buffer overflow)
   if (channel >= num_channels)
   {
-    usb.print("We only have ");
-    usb.print(num_channels, DEC);
-    usb.print(" channels (0 - ");
-    usb.print(num_channels - 1, DEC);
-    usb.println("), ignoring this request!");
     // TODO: log error?
+    if (debug)
+    {
+      usb.print("We only have ");
+      usb.print(num_channels, DEC);
+      usb.print(" channels; ignoring this request!");
+    }
     return;
   }
+  set_dc[channel] = dc;
 
   // Verify we are not already striking the chime, and the settle has completed
   if (!striking[channel] && (strike_timer[channel] >= settle_time))
@@ -304,27 +396,35 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
     // Check for overheat
     if (strikes_remaining[channel] > 0)
     {
-      striking[channel] = true;
-      strike_timer[channel] = 0;
-      strikes_remaining[channel]--;
-      analogWrite(chime_pins[channel], duty_cycle);
+      // Strike the chime!
+      striking[channel] = true; // We are now striking
+      verified[channel] = false; // We need to verify it turns on
+      strike_timer[channel] = 0; // Start strike timer
+      strikes_remaining[channel]--; // We used an available strike
+      analogWrite(chime_pins[channel], duty_cycle); // Turn on PWM
     }
     else
     {
       // Overheated
       // TODO: log this, report to master, etc.
-      usb.print("Channel ");
-      usb.print(channel, DEC);
-      usb.println(" overheated! Skipped strike.");
+      if (debug)
+      {
+        usb.print("Channel ");
+        usb.print(channel + 1, DEC);
+        usb.println(" overheated! Skipped strike.");
+      }
     }
   }
   else
   {
     // Already striking or settling
     // TODO: Log this, report to master, etc.
-    usb.print("Already striking/settling channel ");
-    usb.print(channel, DEC);
-    usb.println("! Skipped strike.");
+    if (debug)
+    {
+      usb.print("Already striking/settling channel ");
+      usb.print(channel + 1, DEC);
+      usb.println("! Skipped strike.");
+    }
   }
 }
 
