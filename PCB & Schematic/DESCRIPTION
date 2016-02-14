@@ -1,0 +1,7 @@
+MIDI control of chimes
+
+Each slave board handles 10 chime coils (up to 10A each) with velocity control!
+
+Master board has physical (DIN) and USB MIDI.
+
+https://github.com/DAVe3283/MIDI-Chimes
