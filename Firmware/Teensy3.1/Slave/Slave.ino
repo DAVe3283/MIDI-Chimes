@@ -6,6 +6,7 @@
 // from overheating.
 //
 // TODO:
+// * can interrupts fire during setup() function? If so, disable them...
 // * log errors
 // * report status to master
 // * measure voltages (on demand? between strikes?)
@@ -148,19 +149,15 @@ float ps_setpoint(0); // Guess power supply setpoint (max measured voltage at st
 // Initial setup routine
 void setup()
 {
-  // Diagnostics
-  usb.begin(9600);
-
-  // Configure I2C
-  Wire.begin(I2C_SLAVE, i2c_address, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
-  Wire.onReceive(i2c_receive);
-  Wire.onRequest(i2c_requested);
-
   // High-Z the PS_Enable pin
   pinMode(ps_enable_pin, INPUT);
 
   // Configure LED
   pinMode(led_pin, OUTPUT);
+
+  // Configure analog inputs
+  analogReadResolution(analog_read_bits);
+  analogReference(INTERNAL); // Set reference voltage to 1.2V
 
   // Configure PWM channels
   analogWriteResolution(pwm_bits);
@@ -173,9 +170,13 @@ void setup()
     strikes_remaining[channel] = max_strikes;
   }
 
-  // Configure analog inputs
-  analogReadResolution(analog_read_bits);
-  analogReference(INTERNAL); // Set reference voltage to 1.2V
+  // Diagnostics
+  usb.begin(9600);
+
+  // Configure I2C
+  Wire.begin(I2C_SLAVE, i2c_address, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
+  Wire.onReceive(i2c_receive);
+  Wire.onRequest(i2c_requested);
 
   // Measure power supply voltages at boot
   // TODO: do we need to wait for the power supply to settle?
@@ -183,6 +184,7 @@ void setup()
   {
     const float voltage(read_voltage(channel));
     ps_voltage[channel] = voltage;
+    verified[channel] = true;
     if (voltage > ps_setpoint)
     {
       ps_setpoint = voltage;
@@ -220,7 +222,7 @@ void loop()
       if (!verified[channel] && (strike_timer[channel] >= (strike_time / 2)))
       {
         const float voltage(read_voltage(channel));
-        const float ideal_voltage(ps_setpoint * set_dc[channel]);
+        const float ideal_voltage(ps_setpoint * (1 - set_dc[channel]));
         const float error((ideal_voltage - voltage) / ps_setpoint);
         // TODO: log/report failures here
         verified[channel] = true;
