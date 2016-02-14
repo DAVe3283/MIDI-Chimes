@@ -6,15 +6,14 @@
 // from overheating.
 //
 // TODO:
-// * can interrupts fire during setup() function? If so, disable them...
-// * log errors
-// * report status to master
-// * measure voltages (on demand? between strikes?)
-// * diagnose transistors
-//   * verify voltage is high when PWM is off (@ bootup?)
-//   * verify voltage is low halfway through strike time
-//   * verify voltage is high halfway through settle time
-//   * be able to handle the powersupply being turned off to save power
+// * Handle address auto-assignment on startup
+// * It looks like interrupts can fire inside setup()...
+//   * I should probably attach the I2C ISRs at the end then.
+// * wait for power supply to get enabled at startup, then settle, then measure channels
+// * periodically check if the power supply is enabled
+//   * if not, don't mark channels as shorted/open.
+//   * Probably just don't run the strike routine at all, so the verification never happens
+// * if a channel is shorted, turn off the master power supply
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
@@ -70,9 +69,9 @@ const uint8_t ps_enable_pin(0);
 const uint8_t led_pin(13);
 
 // Timeouts
-uint16_t strike_time(90); // milliseconds
-uint16_t settle_time(160); // milliseconds
-const uint16_t blink_time(20000); // microseconds
+const uint16_t strike_time( 90); // milliseconds
+const uint16_t settle_time(160); // milliseconds
+const uint16_t blink_time(  20); // milliseconds
 
 // PWM Config
 const uint8_t pwm_bits(12);
@@ -80,12 +79,31 @@ const uint32_t pwm_freq(8789); // Hz
 
 // Voltage Divider
 // I am using a divider of 160k and 10k, giving (160k+10k):10k, or 17:1.
-const float divider_ratio(17.0);
+const float divider_ratio(17.0f);
 // We are using the Teensy's 1.2V stable internal reference for better accuracy.
 // That means we can read 0 - 20.4 volts.
 
 // We can do a 13-bit read on the Teensy 3.1 & 3.2
 const uint8_t analog_read_bits(13);
+
+// Transistor characteristics (for diagnostics)
+// Voltages based on experimental & datasheet values for 2N6387 transistor & my coils
+const float transistor_Vce_drop(  1.1f); // Transistor V_CE when on with my coils (measured value, datasheet spec is <= 2V)
+const float connected_min_voltage(0.5f); // Voltages above this at startup are considered connected
+const float shorted_voltage(      1.5f); // Voltages below this are considered shorted (regardless of ps_setpoint)
+// Error limits (determined experimentally)
+const float max_error_percent(          0.03f); // Max error (ideal - real feedback) as a % of ps_setpoint before evaluating shorts/opens
+const float shorted_percent_ps_setpoint(0.95f); // Voltages lower than this % of ps_setpoint when commanded off are considered shorted
+const float open_percent_ps_setpoint(   0.98f); // Voltages higher than this % of ps_setpoint when commanded on are considered open circuit
+
+// States channels can be in
+enum channel_state_t : uint8_t
+{
+  channel_working = 0,
+  channel_disconnected = 1,
+  channel_failed_short = 2,
+  channel_failed_open = 3,
+};
 
 
 // -----------------------------------------------------------------------------
@@ -112,6 +130,17 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle);
 // Read the voltage on the given channel
 float read_voltage(const uint8_t& channel);
 
+// Check channel for shorts
+bool is_shorted(const float& voltage);
+
+// Check channel for opens
+bool is_open(const float& voltage);
+
+// Verify transistors turn on/off
+bool verify_on(const uint8_t& channel);
+bool verify_off(const uint8_t& channel);
+
+
 // -----------------------------------------------------------------------------
 // Globals
 // -----------------------------------------------------------------------------
@@ -119,10 +148,10 @@ float read_voltage(const uint8_t& channel);
 // Timers
 elapsedMillis cooldown_timer;
 elapsedMillis strike_timer[num_channels];
-elapsedMicros message_blink_timer;
+elapsedMillis message_blink_timer;
 
 // USB Debug
-usb_serial_class  usb = usb_serial_class();
+usb_serial_class usb = usb_serial_class();
 bool debug(false);
 
 // Are we striking currently?
@@ -138,8 +167,14 @@ volatile bool verified[num_channels];
 volatile int8_t strikes_remaining[num_channels];
 
 // Power supply measurements
+//bool ps_enabled(false); // Is the power supply currently enabled?
 float ps_voltage[num_channels]; // Last measured voltage
 float ps_setpoint(0); // Guess power supply setpoint (max measured voltage at startup)
+
+// Channel diagnostics
+channel_state_t channel_state[num_channels];
+uint8_t num_connected_channels(0);
+bool any_shorted(false); // Are any channels shorted?
 
 
 // -----------------------------------------------------------------------------
@@ -174,23 +209,57 @@ void setup()
   usb.begin(9600);
 
   // Configure I2C
+  // TODO: address auto-config
   Wire.begin(I2C_SLAVE, i2c_address, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
   Wire.onReceive(i2c_receive);
   Wire.onRequest(i2c_requested);
 
   // Measure power supply voltages at boot
-  // TODO: do we need to wait for the power supply to settle?
+  // DEBUG: Delay to let power supply reading stabilize
+  delay(100);
+  // TODO: verify power supply is enabled (look for ps_enable_pin to toggle)
   for (int channel(0); channel < num_channels; ++channel)
   {
+    // Get current voltage
     const float voltage(read_voltage(channel));
     ps_voltage[channel] = voltage;
     verified[channel] = true;
+
+    // We assume the power supply setpoint is the max measured voltage
     if (voltage > ps_setpoint)
     {
       ps_setpoint = voltage;
     }
+
+    // Determine if the channel is connected to anything
+    if (voltage > connected_min_voltage)
+    {
+      channel_state[channel] = channel_working;
+      num_connected_channels++;
+    }
+    else
+    {
+      channel_state[channel] = channel_disconnected;
+    }
   }
-  // TODO: determine which channels are not used (0 voltage) vs stuck (low non-zero voltage)
+
+  // Set shorted voltage threshold at startup (possibly more aggressive than during operation)
+  float shorted_level(shorted_voltage);
+  if (shorted_level < (ps_setpoint * shorted_percent_ps_setpoint))
+  {
+    shorted_level = ps_setpoint * shorted_percent_ps_setpoint;
+  }
+
+  // Look for shorted channels at startup
+  for (int channel(0); channel < num_channels; ++channel)
+  {
+    // Only worry about channels that are connected
+    if ((channel_state[channel] != channel_disconnected) && (ps_voltage[channel] < shorted_level))
+    {
+      channel_state[channel] = channel_failed_short;
+      any_shorted = true;
+    }
+  }
 }
 
 // Main program loop
@@ -221,26 +290,8 @@ void loop()
       // Measure feedback voltage halfway through strike time
       if (!verified[channel] && (strike_timer[channel] >= (strike_time / 2)))
       {
-        const float voltage(read_voltage(channel));
-        const float ideal_voltage(ps_setpoint * (1 - set_dc[channel]));
-        const float error((ideal_voltage - voltage) / ps_setpoint);
-        // TODO: log/report failures here
-        verified[channel] = true;
-        if (debug)
-        {
-          usb.print("Verifying channel ");
-          usb.print(channel + 1);
-          usb.println(" during strike:");
-          usb.print("    Ideal voltage: ");
-          usb.print(ideal_voltage);
-          usb.println("V");
-          usb.print("    Measured voltage: ");
-          usb.print(voltage);
-          usb.println("V");
-          usb.print("    Error: ");
-          usb.print(error * 100.0);
-          usb.println("%");
-        }
+        verify_on(channel);
+        // TODO: handle failure?
       }
 
       // Stop strike after timeout
@@ -260,25 +311,8 @@ void loop()
       //       the previous pass through. But we don't care
       if (!verified[channel] && (strike_timer[channel] >= settle_time))
       {
-        ps_voltage[channel] = read_voltage(channel);
-        const float error((ps_setpoint - ps_voltage[channel]) / ps_setpoint);
-        // TODO: log/report failures here
-        verified[channel] = true;
-        if (debug)
-        {
-          usb.print("Verifying channel ");
-          usb.print(channel + 1);
-          usb.println(" after settle:");
-          usb.print("    ps_setpoint: ");
-          usb.print(ps_setpoint);
-          usb.println("V");
-          usb.print("    Measured voltage: ");
-          usb.print(ps_voltage[channel]);
-          usb.println("V");
-          usb.print("    Error: ");
-          usb.print(error * 100.0);
-          usb.println("%");
-        }
+        verify_off(channel);
+        // TODO: handle failure?
       }
     }
   }
@@ -316,13 +350,43 @@ void loop()
       {
         usb.print("Channel ");
         usb.print(channel + 1);
-        usb.print(" last measured ");
+        usb.print(" state is ");
+        usb.print(channel_state[channel]);
+        usb.print(", & last measured ");
         usb.print(ps_voltage[channel]);
         usb.println("V.");
       }
       usb.print("Power supply voltage setpoint estimated to be ");
       usb.print(ps_setpoint);
       usb.println("V.");
+      break;
+
+    case '0':
+      strike_chime(4, (1 << pwm_bits) - 1);
+      break;
+
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+      strike_chime(4, (1 << pwm_bits) * (incomingByte - '0') / 10);
+      break;
+
+    case 'r':
+    case 'R':
+      usb.print("Channel 5 currently measures ");
+      usb.print(read_voltage(4));
+      usb.println("V.");
+      break;
+
+    case 's':
+    case 'S':
+      i2c_requested();
       break;
 
     default:
@@ -357,9 +421,48 @@ void i2c_receive(size_t numBytes)
 
 void i2c_requested()
 {
-  Wire.write(0x8);
-  Wire.write(0xD);
+  // Create buffer to hold message
+  uint8_t buffer[6 + (4 * num_channels)];
+
+  // Header
+  buffer[0] = 0; // Message version
+  buffer[1] = pwm_bits;
+  buffer[2] = num_channels;
+  buffer[3] = num_connected_channels;
+
+  // Power supply setpoint
+  uint16_t ps_mV(static_cast<uint16_t>(ps_setpoint * 1000.0f));
+  memcpy(buffer + 4, &ps_mV, sizeof(ps_mV));
+
+  // Per-channel data
+  for (int channel(0); channel < num_channels; ++channel)
+  {
+    // Channel state
+    buffer[6 + channel] = static_cast<uint8_t>(channel_state[channel]);
+
+    // Strikes remaining before overheat
+    buffer[16 + channel] = strikes_remaining[channel];
+
+    // Last measured voltage (mV)
+    const uint16_t mV(static_cast<uint16_t>(ps_voltage[channel] * 1000.0f));
+    memcpy(buffer + 26 + (sizeof(mV) * channel), &mV, sizeof(mV));
+  }
+
+  // Write status packet
+  const size_t wrote(Wire.write(buffer, sizeof(buffer)));
   message_blink_timer = 0;
+
+  if (debug)
+  {
+    if (wrote != sizeof(buffer))
+    {
+      usb.print("I2C transmission failed! Tried to write ");
+      usb.print(sizeof(buffer));
+      usb.print(" bytes, but was only able to write ");
+      usb.print(wrote);
+      usb.println(" bytes.");
+    }
+  }
 }
 
 void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
@@ -370,7 +473,7 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
     usb.print("Got strike command for channel ");
     usb.print(channel + 1, DEC);
     usb.print(", PWM Duty Cycle: ");
-    usb.print(dc * 100.0);
+    usb.print(dc * 100.0f);
     usb.print("% (");
     usb.print(duty_cycle);
     usb.print("/");
@@ -435,8 +538,132 @@ float read_voltage(const uint8_t& channel)
   const float analog_raw(analogRead(feedback_pins[channel]));
   const float analog_max((1 << analog_read_bits) - 1);
   float voltage
-    = 1.2 // reference voltage
+    = 1.2f // reference voltage
     * divider_ratio // times the divider
     * analog_raw / analog_max; // times the measured ratio
   return voltage;
+}
+
+bool is_shorted(const float& voltage)
+{
+  return voltage < (ps_setpoint * shorted_percent_ps_setpoint);
+}
+
+bool is_open(const float& voltage)
+{
+  return voltage > (ps_setpoint * open_percent_ps_setpoint);
+}
+
+bool verify_on(const uint8_t& channel)
+{
+  // Measure current feedback voltage
+  const float voltage(read_voltage(channel));
+
+  // Ideal voltage is (ps_setpoint - transistor_Vce_drop) * (1 - set_dc[channel]) + transistor_Vce_drop
+  // That can be simplified to save some instructions:
+  const float ideal_voltage(ps_setpoint - ((ps_setpoint - transistor_Vce_drop) * set_dc[channel]));
+
+  // Error between ideal and measured voltage
+  const float error((ideal_voltage - voltage) / ps_setpoint);
+
+  // Verify transistor is in expected range
+  const bool in_range((error < max_error_percent) && (error > -max_error_percent));
+  verified[channel] = true;
+
+  // Handle failures
+  if (!in_range)
+  {
+    // Check if channel failed short circuit
+    if (is_shorted(voltage))
+    {
+      channel_state[channel] = channel_failed_short;
+      any_shorted = true;
+      // TODO: remove debug
+      usb.print("Channel ");
+      usb.print(channel + 1);
+      usb.println(" is shorted!");
+    }
+
+    // Check if channel failed open circuit
+    else if (is_open(voltage))
+    {
+      channel_state[channel] = channel_failed_open;
+      // TODO: remove debug
+      usb.print("Channel ");
+      usb.print(channel + 1);
+      usb.println(" won't turn on!");
+    }
+  }
+
+  if (debug)
+  {
+    usb.print("Verifying channel ");
+    usb.print(channel + 1);
+    usb.println(" during strike:");
+    usb.print("    Ideal voltage: ");
+    usb.print(ideal_voltage);
+    usb.println("V");
+    usb.print("    Measured voltage: ");
+    usb.print(voltage);
+    usb.println("V");
+    usb.print("    Error: ");
+    usb.print(error * 100.0f);
+    usb.println("%");
+    if (!in_range)
+    {
+      usb.println("    **** NOT IN EXPECTED RANGE! ****");
+    }
+  }
+
+  return in_range;
+}
+
+bool verify_off(const uint8_t& channel)
+{
+  ps_voltage[channel] = read_voltage(channel);
+  const float error((ps_setpoint - ps_voltage[channel]) / ps_setpoint);
+
+  // Verify transistor is in expected range
+  const bool in_range((error < max_error_percent) && (error > -max_error_percent));
+  verified[channel] = true;
+
+  // Handle failures
+  if (!in_range)
+  {
+    // Check if channel failed short circuit
+    if (is_shorted(ps_voltage[channel]))
+    {
+      channel_state[channel] = channel_failed_short;
+      any_shorted = true;
+      // TODO: remove debug
+      usb.print("Channel ");
+      usb.print(channel + 1);
+      usb.println(" is shorted!");
+    }
+
+    // Ignore "opens", because that is what we want. It is probably just flyback
+    // voltage anyway.
+  }
+
+  if (debug)
+  {
+    usb.print("Verifying channel ");
+    usb.print(channel + 1);
+    usb.println(" after settle:");
+    usb.print("    ps_setpoint: ");
+    usb.print(ps_setpoint);
+    usb.println("V");
+    usb.print("    Measured voltage: ");
+    usb.print(ps_voltage[channel]);
+    usb.println("V");
+    usb.print("    Error: ");
+    usb.print(error * 100.0f);
+    usb.println("%");
+    if (!in_range)
+    {
+      usb.println("    **** NOT IN EXPECTED RANGE! ****");
+    }
+  }
+
+  return in_range;
 }
