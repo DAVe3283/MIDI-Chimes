@@ -14,17 +14,20 @@ The project uses several Teensy 3.2 microcontrollers. There is a master, which
 handles MIDI and the user interface. The rest are slaves, which run 10 chimes
 each.
 
-The master and slaves communicate over I2C. I plan to just hardcode their
-addresses, because I am in a time crunch. Later, I will do auto-assignment of
-address on bootup.
+The master and slaves communicate over I2C. The master talks to a touch screen
+LCD over SPI.
 
-Currently, the midi_test and i2c_test sketches are doing about what I expect.
+### Libraries
 
-I need to come up with a message set to tell the slave devices when to strike
-the chimes, and how hard.
+I am using the following libraries:
 
-The aftermarket I2C library is pretty slick. I need to use that. Plus, I can set
-the bus speed to something obnoxious.
+* [i2c_t3][] - A superior I2C library that runs quite fast on the Teensy3.
+* [ILI9341_t3][] - An optimized ILI9343 SPI LCD driver library for the Teensy3.
+* [ILI9341_fonts][] - Additional fonts for ILI9341_t3.
+* [Adafruit_STMPE610][] - STMPE610 SPI touch screen controler library.
+
+The Adafruit_STMPE610 library needs `#include <Wire.h>` changed to
+`#include <i2c_t3.h>` or it conflicts with the i2c_t3 library.
 
 ## Schematics
 
@@ -48,14 +51,15 @@ Address latch is used to auto-assign I2C addresses on startup (future use).
 If I did this right, no magic smoke should escape if (when) someone plugs this
 connector in backwards. Off-by-one... not so much.
 
-Notes:
+### Transistor Feedback Voltage
 
-I am planning on using a voltage divider and capacitor to filter the feedback
-voltage from the transistor high-side to verify things are working.
+I am using a 160k / 10k resistor divider, with a 1 uF capacitor in parallel with
+the 10k resistor. Using the Teensy3's internal 1.2V precision reference, I can
+read a transistor voltage of 0 to 20.4 volts. The capacitor filters out the PWM
+frequency, letting me be extremely lazy with my firmware when checking how
+things are working.
 
-The plan is currently a 160k / 10k divider, with a 1uF capacitor in parallel
-with the 10k resistor. This will let me read 0 - 20.4 volts, and should filter
-the PWM out so I can be lazy with my firmware.
+### Master
 
 I need external pullup resistors on the I2C bus, as the internal Teensy ones
 don't work all that well. For high speed, I probably want 1.5k or so.
@@ -74,3 +78,8 @@ Content in each folder may be licensed differently. Overall, I strive to use the
 Unlicense, but some portions may use external libraries preventing that. Those
 portions will be licensed as necessary. Data sheets and the like are provided
 for reference only, and are subject to all licenses/copyright specified within.
+
+[Adafruit_STMPE610]: https://github.com/adafruit/Adafruit_STMPE610
+[i2c_t3]: https://github.com/nox771/i2c_t3
+[ILI9341_fonts]: https://github.com/PaulStoffregen/ILI9341_fonts
+[ILI9341_t3]: https://github.com/PaulStoffregen/ILI9341_t3
