@@ -222,14 +222,6 @@ void setup()
 
   // Configure TFT
   tft.begin();
-  if (!ts.begin())
-  {
-    ser.println("Unable to start touchscreen.");
-  }
-  else
-  {
-    ser.println("Touchscreen started.");
-  }
 
   // Initialize display
   tft.setRotation(1); // Landscape
@@ -253,7 +245,20 @@ void setup()
   draw_master_volume();
 
   // Configure I2C
-  Wire.begin(I2C_MASTER, 0, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
+  Wire.begin(I2C_MASTER, 0, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_100);
+
+  tft.setFontAdafruit();
+  tft.setCursor(0, 0);
+  tft.setTextColor(text_color);
+  if (!ts.begin())
+  {
+    tft.println("Unable to start touchscreen.");
+  }
+  else
+  {
+    tft.println("Touchscreen started.");
+  }
+
 
   // Configure LED
   pinMode(led_pin, OUTPUT);
@@ -276,11 +281,17 @@ void loop()
     // Retrieve a point
     TS_Point p = ts.getPoint();
 
+#ifdef CAPACITIVE_TS
+    // Rotate the screen
+    const int y(p.x);
+    const int x(tft.width() - p.y);
+#else
     // Scale using the calibration #'s and rotate coordinate system
     p.x = map(p.x, ts_min_y, ts_max_y, 0, tft.height());
     p.y = map(p.y, ts_min_x, ts_max_x, 0, tft.width());
     const int x(p.y);
     const int y(tft.height() - p.x);
+#endif
 
     // DEBUG draw touch point
     //tft.drawCircle(x, y, 5, ILI9341_PURPLE);
