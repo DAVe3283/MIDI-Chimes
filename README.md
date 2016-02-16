@@ -24,7 +24,8 @@ I am using the following libraries:
 * [i2c_t3][] - A superior I2C library that runs quite fast on the Teensy3.
 * [ILI9341_t3][] - An optimized ILI9343 SPI LCD driver library for the Teensy3.
 * [ILI9341_fonts][] - Additional fonts for ILI9341_t3.
-* [Adafruit_STMPE610][] - STMPE610 SPI touch screen controler library.
+* [Adafruit_STMPE610][] - STMPE610 SPI touch screen controller library.
+* [Adafruit_FT6206][] - FT6206 I2C touch screen controller library.
 
 The Adafruit_STMPE610 library needs `#include <Wire.h>` changed to
 `#include <i2c_t3.h>` or it conflicts with the i2c_t3 library.
@@ -79,6 +80,7 @@ Unlicense, but some portions may use external libraries preventing that. Those
 portions will be licensed as necessary. Data sheets and the like are provided
 for reference only, and are subject to all licenses/copyright specified within.
 
+[Adafruit_FT6206]: https://github.com/adafruit/Adafruit_FT6206_Library
 [Adafruit_STMPE610]: https://github.com/adafruit/Adafruit_STMPE610
 [i2c_t3]: https://github.com/nox771/i2c_t3
 [ILI9341_fonts]: https://github.com/PaulStoffregen/ILI9341_fonts
