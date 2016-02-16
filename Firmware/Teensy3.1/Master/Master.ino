@@ -45,6 +45,9 @@
 //   * Or save them to the SD card?
 // -----------------------------------------------------------------------------
 
+// Comment this line out if using the resistive touchscreen layer
+#define CAPACITIVE_TS
+
 // -----------------------------------------------------------------------------
 // Includes
 // -----------------------------------------------------------------------------
@@ -53,7 +56,13 @@
 #include <SPI.h>
 #include <i2c_t3.h>
 #include <ILI9341_t3.h>
-#include <Adafruit_STMPE610.h>
+
+// Touchscreen driver
+#ifdef CAPACITIVE_TS
+  #include <Adafruit_FT6206.h>
+#else
+  #include <Adafruit_STMPE610.h>
+#endif
 
 // Fonts
 #include <font_LiberationMono.h>
@@ -195,8 +204,11 @@ HardwareSerial    ser = HardwareSerial();
 
 // Touch Screen
 ILI9341_t3 tft = ILI9341_t3(lcd_cs_pin, lcd_dc_pin, lcd_reset_pin, spi_mosi_pin, spi_sck_pin, spi_miso_pin); // TFT LCD
-Adafruit_STMPE610 ts = Adafruit_STMPE610(touch_cs_pin); // Touch sensor
-
+#ifdef CAPACITIVE_TS
+  Adafruit_FT6206 ts = Adafruit_FT6206();  // Using default Arduino I2C pins?
+#else
+  Adafruit_STMPE610 ts = Adafruit_STMPE610(touch_cs_pin); // Touch sensor
+#endif
 
 // -----------------------------------------------------------------------------
 // Function Definitions
@@ -259,7 +271,7 @@ void loop()
   usbMIDI.read();
 
   // Handle touch events
-  if (!ts.bufferEmpty())
+  if (ts.touched())
   {
     // Retrieve a point
     TS_Point p = ts.getPoint();
