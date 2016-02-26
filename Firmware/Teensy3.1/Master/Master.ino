@@ -58,6 +58,11 @@
 #include <ILI9341_t3.h>
 #include <SdFat.h>
 
+extern "C"
+{
+  #include "ugui.h"
+}
+
 // Touchscreen driver
 #ifdef CAPACITIVE_TS
   #include <Adafruit_FT6206.h>
@@ -181,6 +186,12 @@ bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out,
 void draw_master_volume();
 void update_master_volume();
 
+// µGUI
+void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c);
+// µGUI Hardware Acceleration
+UG_RESULT _HW_DrawLine(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c);
+UG_RESULT _HW_FillFrame(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c);
+
 // DEBUG / TESTING
 void glyph_test();
 bool hit_test(const int16_t& x, const int16_t& y, const int16_t& _x, const int16_t& _y, const int16_t& _w, const int16_t& _h);
@@ -215,6 +226,44 @@ ILI9341_t3 tft = ILI9341_t3(lcd_cs_pin, lcd_dc_pin, lcd_reset_pin, spi_mosi_pin,
 #else
   Adafruit_STMPE610 ts = Adafruit_STMPE610(touch_cs_pin); // Touch sensor
 #endif
+
+// µGUI
+UG_GUI gui;
+#define MAX_OBJECTS 10
+// ^^ temp #define
+UG_WINDOW window0;
+UG_BUTTON button0;
+UG_BUTTON button1;
+UG_BUTTON button2;
+UG_OBJECT obj_buff_window0[MAX_OBJECTS];
+void window0_callback(UG_MESSAGE* msg)
+{
+  if ((msg->type == MSG_TYPE_OBJECT) &&
+      (msg->id == OBJ_TYPE_BUTTON) &&
+      ((msg->event == OBJ_EVENT_CLICKED) || (msg->event == OBJ_EVENT_PRESSED)))
+  {
+    switch (msg->sub_id)
+    {
+    case BTN_ID_0:
+      UG_DriverEnable(DRIVER_DRAW_LINE);
+      UG_DriverEnable(DRIVER_FILL_FRAME);
+      break;
+
+    case BTN_ID_1:
+      UG_DriverDisable(DRIVER_DRAW_LINE);
+      UG_DriverDisable(DRIVER_FILL_FRAME);
+      break;
+
+    case BTN_ID_2:
+      UG_WindowHide(&window0);
+      UG_WindowShow(&window0);
+      break;
+
+    default:
+      break;
+    }
+  }
+}
 
 // -----------------------------------------------------------------------------
 // Function Definitions
@@ -370,6 +419,28 @@ void setup()
   usbMIDI.setHandleNoteOn(OnNoteOn);
   // usbMIDI.setHandleNoteOff(OnNoteOff); // Not needed
   // TODO: handle more MIDI stuff?
+
+  // GUI Tests
+  UG_Init(&gui, UserPixelSetFunction, tft.width(), tft.height());
+  UG_DriverRegister(DRIVER_DRAW_LINE, (void*)_HW_DrawLine);
+  UG_DriverRegister(DRIVER_FILL_FRAME, (void*)_HW_FillFrame);
+  // UG_FontSelect(&FONT_8X12);
+  // UG_PutString(0, 0, "Test");
+  // Window Tests
+  UG_WindowCreate(&window0, obj_buff_window0, MAX_OBJECTS, window0_callback);
+  UG_WindowResize(&window0, 20, 20, 319-20, 239-20);
+  UG_WindowSetTitleText(&window0, "uGUI Test Window");
+  UG_WindowSetTitleTextFont(&window0, &FONT_8X12);
+  UG_ButtonCreate(&window0, &button0, BTN_ID_0, 10, 10, 100,  60);
+  UG_ButtonSetFont(&window0, BTN_ID_0, &FONT_8X12);
+  UG_ButtonSetText(&window0, BTN_ID_0, "H/W Acc\nON");
+  UG_ButtonCreate(&window0, &button1, BTN_ID_1, 10, 70, 100, 130);
+  UG_ButtonSetFont(&window0, BTN_ID_1, &FONT_8X12);
+  UG_ButtonSetText(&window0, BTN_ID_1, "H/W Acc\nOFF");
+  UG_ButtonCreate(&window0, &button2, BTN_ID_2, 110, 10, 200, 60);
+  UG_ButtonSetFont(&window0, BTN_ID_2, &FONT_8X12);
+  UG_ButtonSetText(&window0, BTN_ID_2, "Redraw");
+  UG_WindowShow(&window0);
 }
 
 // Main program loop
@@ -378,7 +449,7 @@ void loop()
   // Handle USB MIDI messages
   usbMIDI.read();
 
-  // Handle touch events
+  // Handle GUI & Touch
   if (ts.touched())
   {
     // Retrieve a point
@@ -396,31 +467,39 @@ void loop()
     const int y(tft.height() - p.x);
 #endif
 
-    // DEBUG draw touch point
-    //tft.drawCircle(x, y, 5, ILI9341_PURPLE);
+    // New GUI Test
+    UG_TouchUpdate(x, y, TOUCH_STATE_PRESSED);
 
-    // DEBUG: manually check volume buttons for hit
-    // TODO: probably make a class for buttons, like Adafruit_GFX_Button
-    //       maybe just fix/extend that one?
-    // Down
-    if (hit_test(x, y, button_vol_d_x, button_vol_d_y, button_vol_w, button_vol_h))
-    {
-      if (master_volume >= 10)
-      {
-        master_volume -= 10;
-        update_master_volume();
-      }
-    }
-    // Up
-    if (hit_test(x, y, button_vol_u_x, button_vol_u_y, button_vol_w, button_vol_h))
-    {
-      if (master_volume <= 90)
-      {
-        master_volume += 10;
-        update_master_volume();
-      }
-    }
+    // // DEBUG draw touch point
+    // tft.drawCircle(x, y, 5, ILI9341_PURPLE);
+
+    // // DEBUG: manually check volume buttons for hit
+    // // TODO: probably make a class for buttons, like Adafruit_GFX_Button
+    // //       maybe just fix/extend that one?
+    // // Down
+    // if (hit_test(x, y, button_vol_d_x, button_vol_d_y, button_vol_w, button_vol_h))
+    // {
+    //   if (master_volume >= 10)
+    //   {
+    //     master_volume -= 10;
+    //     update_master_volume();
+    //   }
+    // }
+    // // Up
+    // if (hit_test(x, y, button_vol_u_x, button_vol_u_y, button_vol_w, button_vol_h))
+    // {
+    //   if (master_volume <= 90)
+    //   {
+    //     master_volume += 10;
+    //     update_master_volume();
+    //   }
+    // }
   }
+  else
+  {
+    UG_TouchUpdate(-1, -1, TOUCH_STATE_RELEASED);
+  }
+  UG_Update();
 }
 
 void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
@@ -611,6 +690,37 @@ void update_master_volume()
   tft.setCursor(text_x, text_y + 2); // Offset because this font setup blows
   tft.print(master_volume);
   tft.print("%");
+}
+
+void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c)
+{
+  tft.drawPixel(x, y, c);
+}
+
+UG_RESULT _HW_DrawLine(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c)
+{
+  // Vertical line
+  if (x1 == x2)
+  {
+    tft.drawFastVLine(x1, y1, y2 - y1 + 1, c);
+    return UG_RESULT_OK;
+  }
+
+  // Horizontal line
+  if (y1 == y2)
+  {
+    tft.drawFastHLine(x1, y1, x2 - x1 + 1, c);
+    return UG_RESULT_OK;
+  }
+
+  // Other lines can't be accelerated
+  return UG_RESULT_FAIL;
+}
+
+UG_RESULT _HW_FillFrame(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c)
+{
+  tft.fillRect(x1, y1, x2 - x1 + 1, y2 - y1 + 1, c);
+  return UG_RESULT_OK;
 }
 
 void glyph_test()
