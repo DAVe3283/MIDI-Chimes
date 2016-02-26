@@ -46,7 +46,7 @@
 // -----------------------------------------------------------------------------
 
 // Comment this line out if using the resistive touchscreen layer
-#define CAPACITIVE_TS
+//#define CAPACITIVE_TS
 
 // -----------------------------------------------------------------------------
 // Includes
@@ -56,6 +56,7 @@
 #include <SPI.h>
 #include <i2c_t3.h>
 #include <ILI9341_t3.h>
+#include <SdFat.h>
 
 // Touchscreen driver
 #ifdef CAPACITIVE_TS
@@ -202,6 +203,11 @@ elapsedMicros message_blink_timer;
 HardwareSerial    ser = HardwareSerial();
 // TODO: hardware MIDI
 
+// SD Card
+SdFat sd;
+SdFile file;
+SdFile dirFile;
+
 // Touch Screen
 ILI9341_t3 tft = ILI9341_t3(lcd_cs_pin, lcd_dc_pin, lcd_reset_pin, spi_mosi_pin, spi_sck_pin, spi_miso_pin); // TFT LCD
 #ifdef CAPACITIVE_TS
@@ -259,6 +265,103 @@ void setup()
     tft.println("Touchscreen started.");
   }
 
+  //////////////////////////////////////////////////////////////////////////////
+  // Directory list SD card
+  //////////////////////////////////////////////////////////////////////////////
+
+  // Init SD
+  tft.print("SdFat version: ");
+  tft.println(SD_FAT_VERSION);
+  if (!sd.begin(sd_cs_pin))
+  {
+    sd.initErrorHalt(&tft);
+  }
+
+  // Display card info
+  const uint32_t cardSize(sd.card()->cardSize());
+  if (cardSize == 0) {
+    sd.errorHalt(&tft, "cardSize failed");
+  }
+  tft.print("Card type: ");
+  switch (sd.card()->type()) {
+  case SD_CARD_TYPE_SD1:
+    tft.println("SD1");
+    break;
+
+  case SD_CARD_TYPE_SD2:
+    tft.println("SD2");
+    break;
+
+  case SD_CARD_TYPE_SDHC:
+    if (cardSize < 70000000) {
+      tft.println("SDHC");
+    } else {
+      tft.println("SDXC");
+    }
+    break;
+
+  default:
+    tft.println("Unknown");
+  }
+
+  // CID Dump
+  cid_t cid;
+  if (!sd.card()->readCID(&cid)) {
+    sd.errorHalt(&tft, "readCID failed");
+  }
+  tft.print("Manufacturer ID: 0x");
+  tft.println(static_cast<int>(cid.mid), HEX);
+  tft.print("OEM ID: 0x");
+  tft.print(cid.oid[0], HEX);
+  tft.println(cid.oid[1], HEX);
+  // tft.print("Product: ");
+  // for (uint8_t i = 0; i < 5; i++) {
+  //   tft.print(cid.pnm[i]);
+  // }
+  // tft.println();
+  // tft.print("Version: ");
+  // tft.print(static_cast<int>(cid.prv_n));
+  // tft.print(".");
+  // tft.println(static_cast<int>(cid.prv_m));
+  tft.print("Serial number: 0x");
+  tft.println(cid.psn, HEX);
+  tft.print("Manufacturing date: ");
+  tft.print(static_cast<int>(cid.mdt_month));
+  tft.print("/");
+  tft.println(2000 + cid.mdt_year_low + 10 * cid.mdt_year_high);
+  tft.println("File listing:");
+
+  //tft.println("SD card found! File listing:");
+  // tft.print("FreeStack: ");
+  // tft.println(FreeStack());
+  // tft.println();
+
+  // List files in root directory.
+  if (!dirFile.open("/", O_READ))
+  {
+    sd.errorHalt(&tft, "open root failed");
+  }
+  uint16_t files_found(0);
+  const uint16_t nMax(13); // Max files to list
+  while (files_found < nMax && file.openNext(&dirFile, O_READ))
+  {
+    // Skip directories and hidden files.
+    if (!file.isSubDir() && !file.isHidden())
+    {
+      // Save dirIndex of file in directory.
+      //dirIndex[files_found] = file.dirIndex();
+
+      // Print the file number and name.
+      files_found++;
+      //tft.print(files_found++);
+      //tft.print(' ');
+      tft.print(file.dirIndex());
+      tft.print(" ");
+      file.printName(&tft);
+      tft.println();
+    }
+    file.close();
+  }
 
   // Configure LED
   pinMode(led_pin, OUTPUT);
