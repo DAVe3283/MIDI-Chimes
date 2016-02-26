@@ -240,18 +240,22 @@ void window0_callback(UG_MESSAGE* msg)
 {
   if ((msg->type == MSG_TYPE_OBJECT) &&
       (msg->id == OBJ_TYPE_BUTTON) &&
-      ((msg->event == OBJ_EVENT_CLICKED) || (msg->event == OBJ_EVENT_PRESSED)))
+      (msg->event == OBJ_EVENT_PRESSED))
   {
     switch (msg->sub_id)
     {
     case BTN_ID_0:
       UG_DriverEnable(DRIVER_DRAW_LINE);
       UG_DriverEnable(DRIVER_FILL_FRAME);
+      UG_ButtonSetBackColor(&window0, BTN_ID_0, C_GREEN);
+      UG_ButtonSetBackColor(&window0, BTN_ID_1, UG_WindowGetBackColor(&window0));
       break;
 
     case BTN_ID_1:
       UG_DriverDisable(DRIVER_DRAW_LINE);
       UG_DriverDisable(DRIVER_FILL_FRAME);
+      UG_ButtonSetBackColor(&window0, BTN_ID_0, UG_WindowGetBackColor(&window0));
+      UG_ButtonSetBackColor(&window0, BTN_ID_1, C_GREEN);
       break;
 
     case BTN_ID_2:
@@ -434,6 +438,7 @@ void setup()
   UG_ButtonCreate(&window0, &button0, BTN_ID_0, 10, 10, 100,  60);
   UG_ButtonSetFont(&window0, BTN_ID_0, &FONT_8X12);
   UG_ButtonSetText(&window0, BTN_ID_0, "H/W Acc\nON");
+  UG_ButtonSetBackColor(&window0, BTN_ID_0, C_GREEN);
   UG_ButtonCreate(&window0, &button1, BTN_ID_1, 10, 70, 100, 130);
   UG_ButtonSetFont(&window0, BTN_ID_1, &FONT_8X12);
   UG_ButtonSetText(&window0, BTN_ID_1, "H/W Acc\nOFF");
@@ -450,55 +455,50 @@ void loop()
   usbMIDI.read();
 
   // Handle GUI & Touch
-  if (ts.touched())
+  const bool touched(ts.touched());
+#ifdef CAPACITIVE_TS
+  if (touched)
   {
     // Retrieve a point
     TS_Point p = ts.getPoint();
 
-#ifdef CAPACITIVE_TS
     // Rotate the screen
     const int y(p.x);
     const int x(tft.width() - p.y);
-#else
-    // Scale using the calibration #'s and rotate coordinate system
-    p.x = map(p.x, ts_min_y, ts_max_y, 0, tft.height());
-    p.y = map(p.y, ts_min_x, ts_max_x, 0, tft.width());
-    const int x(p.y);
-    const int y(tft.height() - p.x);
-#endif
 
     // New GUI Test
     UG_TouchUpdate(x, y, TOUCH_STATE_PRESSED);
-
-    // // DEBUG draw touch point
-    // tft.drawCircle(x, y, 5, ILI9341_PURPLE);
-
-    // // DEBUG: manually check volume buttons for hit
-    // // TODO: probably make a class for buttons, like Adafruit_GFX_Button
-    // //       maybe just fix/extend that one?
-    // // Down
-    // if (hit_test(x, y, button_vol_d_x, button_vol_d_y, button_vol_w, button_vol_h))
-    // {
-    //   if (master_volume >= 10)
-    //   {
-    //     master_volume -= 10;
-    //     update_master_volume();
-    //   }
-    // }
-    // // Up
-    // if (hit_test(x, y, button_vol_u_x, button_vol_u_y, button_vol_w, button_vol_h))
-    // {
-    //   if (master_volume <= 90)
-    //   {
-    //     master_volume += 10;
-    //     update_master_volume();
-    //   }
-    // }
   }
   else
   {
     UG_TouchUpdate(-1, -1, TOUCH_STATE_RELEASED);
   }
+#else // Resistive touch screen
+  if (!ts.bufferEmpty())
+  {
+    // Retrieve a point
+    TS_Point p = ts.getPoint();
+
+    // Scale using the calibration #'s and rotate coordinate system
+    p.x = map(p.x, ts_min_y, ts_max_y, 0, tft.height());
+    p.y = map(p.y, ts_min_x, ts_max_x, 0, tft.width());
+    const int x(p.y);
+    const int y(tft.height() - p.x);
+
+    // New GUI Test
+    UG_TouchUpdate(x, y, touched ? TOUCH_STATE_PRESSED : TOUCH_STATE_RELEASED);
+  }
+  else
+  {
+    if (!touched)
+    {
+      UG_TouchUpdate(-1, -1, TOUCH_STATE_RELEASED);
+    }
+  }
+#endif
+
+
+
   UG_Update();
 }
 
