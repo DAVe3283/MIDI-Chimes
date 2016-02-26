@@ -240,7 +240,7 @@ void window0_callback(UG_MESSAGE* msg)
 {
   if ((msg->type == MSG_TYPE_OBJECT) &&
       (msg->id == OBJ_TYPE_BUTTON) &&
-      (msg->event == OBJ_EVENT_PRESSED))
+      (msg->event == BTN_EVENT_CLICKED))
   {
     switch (msg->sub_id)
     {

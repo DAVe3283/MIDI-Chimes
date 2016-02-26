@@ -7041,12 +7041,6 @@ void _UG_ButtonUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
    /* -------------------------------------------------- */
    if ( (obj->touch_state & OBJ_TOUCH_STATE_CHANGED) )
    {
-      /* Handle 'click' event */
-      if ( obj->touch_state & OBJ_TOUCH_STATE_CLICK_ON_OBJECT )
-      {
-         obj->event = BTN_EVENT_CLICKED;
-         obj->state |= OBJ_STATE_UPDATE;
-      }
       /* Is the button pressed down? */
       if ( obj->touch_state & OBJ_TOUCH_STATE_PRESSED_ON_OBJECT )
       {
@@ -7060,6 +7054,12 @@ void _UG_ButtonUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
          btn->state &= ~BTN_STATE_PRESSED;
          obj->state |= OBJ_STATE_UPDATE;
          obj->event = OBJ_EVENT_RELEASED;
+      }
+      /* Handle 'click' event */
+      if ( obj->touch_state & OBJ_TOUCH_STATE_CLICK_ON_OBJECT )
+      {
+         obj->event = BTN_EVENT_CLICKED;
+         obj->state |= OBJ_STATE_UPDATE;
       }
       obj->touch_state &= ~OBJ_TOUCH_STATE_CHANGED;
    }
@@ -7612,12 +7612,6 @@ void _UG_CheckboxUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
    /* -------------------------------------------------- */
    if ( (obj->touch_state & OBJ_TOUCH_STATE_CHANGED) )
    {
-      /* Handle 'click' event */
-      if ( obj->touch_state & OBJ_TOUCH_STATE_CLICK_ON_OBJECT )
-      {
-         obj->event = CHB_EVENT_CLICKED;
-         obj->state |= OBJ_STATE_UPDATE;
-      }
       /* Is the Checkbox pressed down? */
       if ( obj->touch_state & OBJ_TOUCH_STATE_PRESSED_ON_OBJECT )
       {
@@ -7633,6 +7627,12 @@ void _UG_CheckboxUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
          obj->event = OBJ_EVENT_RELEASED;
           
          chb->checked = !chb->checked; 
+      }
+      /* Handle 'click' event */
+      if ( obj->touch_state & OBJ_TOUCH_STATE_CLICK_ON_OBJECT )
+      {
+         obj->event = CHB_EVENT_CLICKED;
+         obj->state |= OBJ_STATE_UPDATE;
       }
       obj->touch_state &= ~OBJ_TOUCH_STATE_CHANGED;
    }
