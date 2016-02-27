@@ -21,7 +21,6 @@
 //#define  USE_FONT_8X8
 //#define  USE_FONT_8X12_CYRILLIC
 #define  USE_FONT_8X12
-//#define  USE_FONT_8X12
 //#define  USE_FONT_8X14
 //#define  USE_FONT_10X16
 //#define  USE_FONT_12X16

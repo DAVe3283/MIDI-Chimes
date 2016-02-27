@@ -4936,7 +4936,7 @@ void UG_DrawLine( UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c )
    }  
 }
 
-void UG_PutString( UG_S16 x, UG_S16 y, char* str )
+void UG_PutString( UG_S16 x, UG_S16 y, const char* str )
 {
    UG_S16 xp,yp;
    UG_U8 cw;
@@ -4973,7 +4973,7 @@ void UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc )
 	_UG_PutChar(chr,x,y,fc,bc,&gui->font);
 }
 
-void UG_ConsolePutString( char* str )
+void UG_ConsolePutString( const char* str )
 {
    char chr;
    UG_U8 cw;
@@ -5323,9 +5323,9 @@ void _UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const 
 			  for( i=0;i<actual_char_width;i++ )
 			  {
 				 b = font->p[index++];
-				 color = (((fc & 0xFF) * b + (bc & 0xFF) * (256 - b)) >> 8) & 0xFF |//Blue component
-				         (((fc & 0xFF00) * b + (bc & 0xFF00) * (256 - b)) >> 8)  & 0xFF00|//Green component
-				         (((fc & 0xFF0000) * b + (bc & 0xFF0000) * (256 - b)) >> 8) & 0xFF0000; //Red component
+				 color = ((((fc & 0xFF) * b + (bc & 0xFF) * (256 - b)) >> 8) & 0xFF) | // Blue component
+				         ((((fc & 0xFF00) * b + (bc & 0xFF00) * (256 - b)) >> 8)  & 0xFF00) | // Green component
+				         ((((fc & 0xFF0000) * b + (bc & 0xFF0000) * (256 - b)) >> 8) & 0xFF0000); // Red component
 				 push_pixel(color);
 			  }
 			  index += font->char_width - actual_char_width;
@@ -5372,9 +5372,9 @@ void _UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const 
             for( i=0;i<actual_char_width;i++ )
             {
                b = font->p[index++];
-               color = (((fc & 0xFF) * b + (bc & 0xFF) * (256 - b)) >> 8) & 0xFF |//Blue component
-                       (((fc & 0xFF00) * b + (bc & 0xFF00) * (256 - b)) >> 8)  & 0xFF00|//Green component
-                       (((fc & 0xFF0000) * b + (bc & 0xFF0000) * (256 - b)) >> 8) & 0xFF0000; //Red component
+               color = ((((fc & 0xFF) * b + (bc & 0xFF) * (256 - b)) >> 8) & 0xFF) | // Blue component
+                       ((((fc & 0xFF00) * b + (bc & 0xFF00) * (256 - b)) >> 8)  & 0xFF00) | // Green component
+                       ((((fc & 0xFF0000) * b + (bc & 0xFF0000) * (256 - b)) >> 8) & 0xFF0000); // Red component
                gui->pset(xo,yo,color);
                xo++;
             }
@@ -5401,8 +5401,8 @@ void _UG_PutText(UG_TEXT* txt)
 
    char chr;
 
-   char* str = txt->str;
-   char* c = str;
+   const char* str = txt->str;
+   const char* c = str;
 
    if ( txt->font->p == NULL ) return;
    if ( str == NULL ) return;
@@ -6084,7 +6084,7 @@ UG_RESULT UG_WindowSetTitleInactiveColor( UG_WINDOW* wnd, UG_COLOR c )
    return UG_RESULT_FAIL;
 }
 
-UG_RESULT UG_WindowSetTitleText( UG_WINDOW* wnd, char* str )
+UG_RESULT UG_WindowSetTitleText( UG_WINDOW* wnd, const char* str )
 {
    if ( (wnd != NULL) && (wnd->state & WND_STATE_VALID) )
    {
@@ -6288,9 +6288,9 @@ UG_COLOR UG_WindowGetTitleInactiveColor( UG_WINDOW* wnd )
    return c;
 }
 
-char* UG_WindowGetTitleText( UG_WINDOW* wnd )
+const char* UG_WindowGetTitleText( UG_WINDOW* wnd )
 {
-   char* str = NULL;
+   const char* str = NULL;
    if ( (wnd != NULL) && (wnd->state & WND_STATE_VALID) )
    {
       str = wnd->title.str;
@@ -6752,7 +6752,7 @@ UG_RESULT UG_ButtonSetAlternateBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR abc
    return UG_RESULT_OK;
 }
 
-UG_RESULT UG_ButtonSetText( UG_WINDOW* wnd, UG_U8 id, char* str )
+UG_RESULT UG_ButtonSetText( UG_WINDOW* wnd, UG_U8 id, const char* str )
 {
    UG_OBJECT* obj=NULL;
    UG_BUTTON* btn=NULL;
@@ -6935,11 +6935,11 @@ UG_COLOR UG_ButtonGetAlternateBackColor( UG_WINDOW* wnd, UG_U8 id )
    return c;
 }
 
-char* UG_ButtonGetText( UG_WINDOW* wnd, UG_U8 id )
+const char* UG_ButtonGetText( UG_WINDOW* wnd, UG_U8 id )
 {
    UG_OBJECT* obj=NULL;
    UG_BUTTON* btn=NULL;
-   char* str = NULL;
+   const char* str = NULL;
 
    obj = _UG_SearchObject( wnd, OBJ_TYPE_BUTTON, id );
    if ( obj != NULL )
@@ -7307,7 +7307,7 @@ UG_RESULT UG_CheckboxSetAlternateBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR a
    return UG_RESULT_OK;
 }
 
-UG_RESULT UG_CheckboxSetText( UG_WINDOW* wnd, UG_U8 id, char* str )
+UG_RESULT UG_CheckboxSetText( UG_WINDOW* wnd, UG_U8 id, const char* str )
 {
    UG_OBJECT* obj=NULL;
    UG_CHECKBOX* btn=NULL;
@@ -7505,11 +7505,11 @@ UG_COLOR UG_CheckboxGetAlternateBackColor( UG_WINDOW* wnd, UG_U8 id )
    return c;
 }
 
-char* UG_CheckboxGetText( UG_WINDOW* wnd, UG_U8 id )
+const char* UG_CheckboxGetText( UG_WINDOW* wnd, UG_U8 id )
 {
    UG_OBJECT* obj=NULL;
    UG_CHECKBOX* btn=NULL;
-   char* str = NULL;
+   const char* str = NULL;
 
    obj = _UG_SearchObject( wnd, OBJ_TYPE_CHECKBOX, id );
    if ( obj != NULL )
@@ -7854,7 +7854,7 @@ UG_RESULT UG_TextboxSetBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR bc )
    return UG_RESULT_OK;
 }
 
-UG_RESULT UG_TextboxSetText( UG_WINDOW* wnd, UG_U8 id, char* str )
+UG_RESULT UG_TextboxSetText( UG_WINDOW* wnd, UG_U8 id, const char* str )
 {
    UG_OBJECT* obj=NULL;
    UG_TEXTBOX* txb=NULL;
@@ -7959,11 +7959,11 @@ UG_COLOR UG_TextboxGetBackColor( UG_WINDOW* wnd, UG_U8 id )
    return c;
 }
 
-char* UG_TextboxGetText( UG_WINDOW* wnd, UG_U8 id )
+const char* UG_TextboxGetText( UG_WINDOW* wnd, UG_U8 id )
 {
    UG_OBJECT* obj=NULL;
    UG_TEXTBOX* txb=NULL;
-   char* str = NULL;
+   const char* str = NULL;
 
    obj = _UG_SearchObject( wnd, OBJ_TYPE_TEXTBOX, id );
    if ( obj != NULL )
