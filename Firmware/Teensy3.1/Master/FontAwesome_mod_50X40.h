@@ -1,0 +1,1 @@
+extern const UG_FONT font_FontAwesome_mod_50X40;
