@@ -150,14 +150,8 @@ const uint16_t bsod_bg_windows_xp(0x0010); // #000082 --> RGB565
 const uint16_t bsod_fg_windows_xp(0xFFFF); // #FFFFFF --> RGB565
 const uint16_t bsod_bg_windows_10(0x2336); // #2067B2 --> RGB565
 const uint16_t bsod_fg_windows_10(0xFFFF); // #FFFFFF --> RGB565
-const uint16_t background_color(ILI9341_BLUE);
-const uint16_t text_color(ILI9341_WHITE);
-const uint16_t button_color(ILI9341_WHITE);
-const uint16_t button_border(ILI9341_BLACK);
-const uint16_t button_text(button_border);
-const uint16_t button_text_disabled(ILI9341_LIGHTGREY);
-const  int16_t button_radius(5);
-const uint16_t volume_color(ILI9341_RED);
+const uint16_t background_color(ILI9341_YELLOW);
+const uint16_t button_text_disabled(C_GRAY);
 
 // Icons
 const char fa_icon_settings[] = "u"; // Sliders
@@ -205,7 +199,10 @@ UG_RESULT _HW_DrawLine(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c);
 UG_RESULT _HW_FillFrame(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c);
 // Main Window
 void draw_main_window();
-void main_window_callback(UG_MESSAGE* msg);
+void main_callback(UG_MESSAGE* msg);
+// Settings Window
+// void draw_settings_window();
+// void settings_callback(UG_MESSAGE* msg);
 // BSOD
 void draw_BSOD();
 
@@ -309,11 +306,15 @@ void setup()
   // Configure LED
   pinMode(led_pin, OUTPUT);
 
+  // Debug trigger
+  digitalWrite(led_pin, HIGH);
+
   // Configure TFT
   tft.begin();
   tft.setRotation(1); // Landscape
   tft.fillScreen(background_color);
 
+  digitalWrite(led_pin, LOW);
   // Configure GUI
   UG_Init(&gui, UserPixelSetFunction, tft.width(), tft.height());
   UG_DriverRegister(DRIVER_DRAW_LINE, (void*)_HW_DrawLine);
@@ -328,29 +329,34 @@ void setup()
 
   // Initialize Touch Screen
   UG_ConsolePutString("Starting touchscreen...");
+  ser.print("ts.begin()");
+  digitalWrite(led_pin, HIGH);
   if (!ts.begin())
   {
     draw_BSOD();
     tft.println("Unable to start touchscreen.");
-    SysCall::halt();
+    while (1) { yield(); }
   }
-  else
-  {
-    UG_ConsolePutString("done.\n");
-  }
+  digitalWrite(led_pin, LOW);
+  UG_ConsolePutString("done.\n");
 
   // Configure I2C
-  Wire.begin(I2C_MASTER, 0, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_100);
+  Wire.begin(I2C_MASTER, 0, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
   // TODO: check for fails
 
   // Initialize SD Card
   UG_ConsolePutString("Starting SD Card...");
+  ser.print("sd.begin()");
+  digitalWrite(led_pin, HIGH);
   if (!sd.begin(sd_cs_pin))
   {
     draw_BSOD();
     sd.initErrorHalt(&tft);
   }
+  digitalWrite(led_pin, LOW);
   UG_ConsolePutString("done.\n");
+
+  // TODO: read config file
 
   //////////////////////////////////////////////////////////////////////////////
   // Directory list SD card
@@ -600,13 +606,32 @@ void adjust_master_volume(int8_t change)
 {
   // Adjust the volume
   master_volume += change;
-  if (master_volume > 100)
+
+  // Limit range to 0-100, enable/disable buttons
+  if (master_volume >= 100)
   {
     master_volume = 100;
+
+    // Disable volume up button
+    UG_ButtonSetForeColor(&main_window, BTN_ID_2, button_text_disabled);
+    UG_ButtonSetStyle(&main_window, BTN_ID_2, BTN_STYLE_2D);
   }
-  else if (master_volume < 0)
+  else if (master_volume <= 0)
   {
     master_volume = 0;
+
+    // Disable volume down button
+    UG_ButtonSetForeColor(&main_window, BTN_ID_1, button_text_disabled);
+    UG_ButtonSetStyle(&main_window, BTN_ID_1, BTN_STYLE_2D);
+  }
+  else
+  {
+    // Enable both buttons
+    const UG_COLOR fg(UG_WindowGetForeColor(&main_window));
+    UG_ButtonSetForeColor(&main_window, BTN_ID_1, fg);
+    UG_ButtonSetStyle(&main_window, BTN_ID_1, BTN_STYLE_3D);
+    UG_ButtonSetForeColor(&main_window, BTN_ID_2, fg);
+    UG_ButtonSetStyle(&main_window, BTN_ID_2, BTN_STYLE_3D);
   }
 
   // Update the text
@@ -648,7 +673,7 @@ UG_RESULT _HW_FillFrame(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c)
 void draw_main_window()
 {
   // Window
-  UG_WindowCreate(&main_window, main_window_buffer, sizeof(main_window_buffer) / sizeof(*main_window_buffer), main_window_callback);
+  UG_WindowCreate(&main_window, main_window_buffer, sizeof(main_window_buffer) / sizeof(*main_window_buffer), main_callback);
   UG_WindowSetTitleTextAlignment(&main_window, ALIGN_CENTER);
   UG_WindowSetTitleText(&main_window, "MIDI Chimes");
 
@@ -697,7 +722,7 @@ void draw_main_window()
   adjust_master_volume(0);
 }
 
-void main_window_callback(UG_MESSAGE* msg)
+void main_callback(UG_MESSAGE* msg)
 {
   // TODO: Handle press and hold for volume keys?
   // I would need to do a rate-limit of some kind
