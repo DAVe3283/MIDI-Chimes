@@ -154,9 +154,17 @@ const uint16_t button_text_disabled(C_GRAY);
 const uint16_t selected_color(C_GREEN);
 
 // Icons
-const char fa_icon_settings[] = "u"; // Sliders
-const char fa_icon_vol_dn[] = "F"; // Volume Down
-const char fa_icon_vol_up[] = "G"; // Volume Up
+const char fa_icon_settings[] = "u";       // Sliders
+const char fa_icon_vol_dn[] = "F";         // Volume Down
+const char fa_icon_vol_up[] = "G";         // Volume Up
+const char fa_icon_level_up[] = "]";       // Level Up
+const char fa_icon_level_down[] = "^";     // Level Down
+const char fa_icon_folder_closed[] = "_";  // Folder, Closed (solid)
+const char fa_icon_folder_open[] = "a";    // Folder, Open (solid)
+const char fa_icon_file_generic[] = "d";   // File, Generic (outline)
+const char fa_icon_file_picture[] = "k";   // File, Picture / Image (outline)
+const char fa_icon_file_sound[] = "m";     // File, Sound / Music (outline)
+const char fa_icon_file_config[] = "o";    // File, Code / Config (outline)
 
 // DEBUG: volume button sizes (until I make a class and do this right)
 const int16_t button_vol_d_x(  5);
@@ -197,12 +205,18 @@ void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c);
 // µGUI Hardware Acceleration
 UG_RESULT _HW_DrawLine(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c);
 UG_RESULT _HW_FillFrame(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c);
+
 // Main Window
 void draw_main_window();
 void main_callback(UG_MESSAGE* msg);
+
 // Settings Window
 void draw_settings_window();
 void settings_callback(UG_MESSAGE* msg);
+
+// File Browse window
+void draw_fb_window();
+void fb_window_callback(UG_MESSAGE* msg);
 
 
 // -----------------------------------------------------------------------------
@@ -240,11 +254,23 @@ UG_GUI gui;
 // Main Window
 UG_WINDOW main_window;
 UG_BUTTON main_window_button_settings;
+UG_BUTTON main_window_button_browse;
 UG_BUTTON main_window_button_vol_dn;
 UG_BUTTON main_window_button_vol_up;
 UG_PROGRESSBAR main_window_prb_volume;
-UG_OBJECT main_window_buffer[4];
+UG_OBJECT main_window_buffer[5];
 char volume_text_buffer[5] = { 0 };
+
+// File Browse window
+UG_WINDOW fb_window;
+UG_BUTTON fb_up_button;
+UG_BUTTON fb_down_button;
+UG_BUTTON fb_cancel_button;
+UG_BUTTON fb_select_button;
+UG_TEXTBOX fb_current_path;
+UG_TEXTBOX fb_file_list;
+UG_OBJECT fb_window_buffer[6];
+
 // Settings Window
 UG_WINDOW settings_window;
 UG_BUTTON settings_hw_accel_on_button;
@@ -415,6 +441,9 @@ void setup()
 
   // Draw Main Window
   draw_main_window();
+
+  // file browse window
+  draw_fb_window();
 
   // Settings window
   draw_settings_window();
@@ -666,15 +695,24 @@ void draw_main_window()
   UG_ButtonSetFont(&main_window, BTN_ID_2, &font_FontAwesome_mod_50X40);
   UG_ButtonSetText(&main_window, BTN_ID_2, fa_icon_vol_up);
 
+  // Browse button
+  UG_ButtonCreate(&main_window, &main_window_button_browse, BTN_ID_3,
+    width - padding - button_size,
+    padding,
+    width - padding,
+    padding + button_size);
+  UG_ButtonSetFont(&main_window, BTN_ID_3, &font_FontAwesome_mod_50X40);
+  UG_ButtonSetText(&main_window, BTN_ID_3, fa_icon_folder_open);
+
   // Volume progress bar
-  UG_ProgressbarCreate(&main_window, &main_window_prb_volume, TXB_ID_0,
+  UG_ProgressbarCreate(&main_window, &main_window_prb_volume, PRB_ID_0,
     padding + button_size + padding,
     height - padding - button_size,
     width - padding - button_size - padding,
     height - padding);
-  UG_ProgressbarSetFont(&main_window, TXB_ID_0, &FONT_24X40);
-  UG_ProgressbarSetAlignment(&main_window, TXB_ID_0, ALIGN_CENTER);
-  UG_ProgressbarSetBarColor(&main_window, TXB_ID_0, C_RED);
+  UG_ProgressbarSetFont(&main_window, PRB_ID_0, &FONT_24X40);
+  UG_ProgressbarSetAlignment(&main_window, PRB_ID_0, ALIGN_CENTER);
+  UG_ProgressbarSetBarColor(&main_window, PRB_ID_0, C_RED);
   adjust_master_volume(0);
 }
 
@@ -701,6 +739,11 @@ void main_callback(UG_MESSAGE* msg)
     // Volume Up
     case BTN_ID_2:
       adjust_master_volume(10);
+      break;
+
+    // Browse button
+    case BTN_ID_3:
+      UG_WindowShow(&fb_window);
       break;
 
     default:
@@ -763,6 +806,103 @@ void settings_callback(UG_MESSAGE* msg)
       UG_WindowHide(&settings_window);
       break;
 
+    default:
+      break;
+    }
+  }
+}
+
+void draw_fb_window()
+{
+  // Window setup
+  const uint16_t window_padding(10);
+  UG_WindowCreate(&fb_window, fb_window_buffer, sizeof(fb_window_buffer) / sizeof(*fb_window_buffer), fb_window_callback);
+  UG_WindowResize(&fb_window,
+    window_padding,
+    window_padding*2,
+    UG_WindowGetOuterWidth(&main_window) - window_padding,
+    UG_WindowGetOuterHeight(&main_window) - window_padding);
+  UG_WindowSetTitleTextAlignment(&fb_window, ALIGN_CENTER);
+  UG_WindowSetTitleText(&fb_window, "Select File");
+  UG_WindowSetTitleTextFont(&fb_window, &FONT_8X12);
+
+  // UI layout variables
+  const uint16_t width(UG_WindowGetInnerWidth(&fb_window));
+  const uint16_t height(UG_WindowGetInnerHeight(&fb_window));
+  const uint16_t padding(5);
+  const uint16_t button_size(50);
+
+  // Scroll up button (top right)
+  UG_ButtonCreate(&fb_window, &fb_up_button, BTN_ID_0,
+    width - padding - button_size,
+    padding,
+    width - padding,
+    padding + button_size);
+  UG_ButtonSetFont(&fb_window, BTN_ID_0, &font_FontAwesome_mod_50X40);
+  UG_ButtonSetText(&fb_window, BTN_ID_0, fa_icon_level_up);
+
+  // Scroll down button (bottom right)
+  UG_ButtonCreate(&fb_window, &fb_down_button, BTN_ID_1,
+    width - padding - button_size,
+    height - padding - button_size,
+    width - padding,
+    height - padding);
+  UG_ButtonSetFont(&fb_window, BTN_ID_1, &font_FontAwesome_mod_50X40);
+  UG_ButtonSetText(&fb_window, BTN_ID_1, fa_icon_level_down);
+
+  // Cancel/close button (top left)
+  UG_ButtonCreate(&fb_window, &fb_cancel_button, BTN_ID_2,
+    padding,
+    padding,
+    padding + button_size,
+    padding + button_size);
+  UG_ButtonSetFont(&fb_window, BTN_ID_2, &FONT_24X40);
+  UG_ButtonSetText(&fb_window, BTN_ID_2, "X");
+
+  // Select button (center right)
+  UG_ButtonCreate(&fb_window, &fb_select_button, BTN_ID_3,
+    width - padding - button_size,
+    padding + button_size + padding,
+    width - padding,
+    height - padding - button_size - padding);
+  UG_ButtonSetFont(&fb_window, BTN_ID_3, &FONT_24X40);
+  UG_ButtonSetText(&fb_window, BTN_ID_3, ">");
+
+  // Current path text box (top center)
+  UG_TextboxCreate(&fb_window, &fb_current_path, TXB_ID_0,
+    padding + button_size + padding,
+    padding,
+    width - padding - button_size - padding,
+    padding + button_size);
+  UG_TextboxSetFont(&fb_window, TXB_ID_0, &FONT_8X12);
+  UG_TextboxSetAlignment(&fb_window, TXB_ID_0, ALIGN_CENTER);
+  UG_TextboxSetBackColor(&fb_window, TXB_ID_0, C_WHITE);
+  UG_TextboxSetForeColor(&fb_window, TXB_ID_0, C_BLACK);
+
+  // File list text box (main area)
+  UG_TextboxCreate(&fb_window, &fb_file_list, TXB_ID_1,
+    padding,
+    padding + button_size + padding,
+    width - padding - button_size - padding,
+    height - padding);
+  UG_TextboxSetFont(&fb_window, TXB_ID_1, &FONT_8X12);
+  UG_TextboxSetAlignment(&fb_window, TXB_ID_1, ALIGN_CENTER);
+  UG_TextboxSetBackColor(&fb_window, TXB_ID_1, C_WHITE);
+  UG_TextboxSetForeColor(&fb_window, TXB_ID_1, C_BLACK);
+}
+
+void fb_window_callback(UG_MESSAGE* msg)
+{
+  if ((msg->type == MSG_TYPE_OBJECT) &&
+      (msg->id == OBJ_TYPE_BUTTON) &&
+      (msg->event == BTN_EVENT_CLICKED))
+  {
+    switch (msg->sub_id)
+    {
+    case BTN_ID_2:  // Close window
+      UG_WindowHide(&fb_window);
+      break;
+      
     default:
       break;
     }
