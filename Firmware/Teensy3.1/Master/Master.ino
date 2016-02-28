@@ -237,23 +237,21 @@ ILI9341_t3 tft = ILI9341_t3(lcd_cs_pin, lcd_dc_pin, lcd_reset_pin, spi_mosi_pin,
 
 // µGUI
 UG_GUI gui;
-#define MAX_OBJECTS 10
-// ^^ temp #define
 // Main Window
 UG_WINDOW main_window;
 UG_BUTTON main_window_button_settings;
 UG_BUTTON main_window_button_vol_dn;
 UG_BUTTON main_window_button_vol_up;
 UG_PROGRESSBAR main_window_prb_volume;
-UG_OBJECT main_window_buffer[MAX_OBJECTS];
-char volume_text_buffer[16] = { 0 };
+UG_OBJECT main_window_buffer[4];
+char volume_text_buffer[5] = { 0 };
 // Settings Window
 UG_WINDOW settings_window;
 UG_BUTTON settings_hw_accel_on_button;
 UG_BUTTON settings_hw_accel_off_button;
 UG_BUTTON settings_redraw_button;
 UG_BUTTON settings_close_button;
-UG_OBJECT obj_buff_settings_window[MAX_OBJECTS];
+UG_OBJECT obj_buff_settings_window[4];
 
 // -----------------------------------------------------------------------------
 // Function Definitions
@@ -417,10 +415,12 @@ void setup()
 
   // Draw Main Window
   draw_main_window();
-  UG_WindowShow(&main_window);
 
   // Settings window
   draw_settings_window();
+
+  // Start GUI at main window
+  UG_WindowShow(&main_window);
 }
 
 // Main program loop
@@ -589,7 +589,7 @@ void adjust_master_volume(int8_t change)
   const UG_U8 last_vol(UG_ProgressbarGetValue(&main_window, PRB_ID_0));
   if (last_vol != master_volume)
   {
-    sprintf(volume_text_buffer, "Volume: %d%%", master_volume);
+    sprintf(volume_text_buffer, "%d%%", master_volume);
     UG_ProgressbarSetText(&main_window, PRB_ID_0, volume_text_buffer);
     UG_ProgressbarSetValue(&main_window, PRB_ID_0, master_volume);
   }
@@ -666,13 +666,13 @@ void draw_main_window()
   UG_ButtonSetFont(&main_window, BTN_ID_2, &font_FontAwesome_mod_50X40);
   UG_ButtonSetText(&main_window, BTN_ID_2, fa_icon_vol_up);
 
-  // Volume text box
+  // Volume progress bar
   UG_ProgressbarCreate(&main_window, &main_window_prb_volume, TXB_ID_0,
     padding + button_size + padding,
     height - padding - button_size,
     width - padding - button_size - padding,
     height - padding);
-  UG_ProgressbarSetFont(&main_window, TXB_ID_0, &FONT_8X12);
+  UG_ProgressbarSetFont(&main_window, TXB_ID_0, &FONT_24X40);
   UG_ProgressbarSetAlignment(&main_window, TXB_ID_0, ALIGN_CENTER);
   UG_ProgressbarSetBarColor(&main_window, TXB_ID_0, C_RED);
   adjust_master_volume(0);
@@ -713,7 +713,7 @@ void main_callback(UG_MESSAGE* msg)
 
 void draw_settings_window()
 {
-  UG_WindowCreate(&settings_window, obj_buff_settings_window, MAX_OBJECTS, settings_callback);
+  UG_WindowCreate(&settings_window, obj_buff_settings_window, sizeof(obj_buff_settings_window) / sizeof(*obj_buff_settings_window), settings_callback);
   UG_WindowResize(&settings_window, 20, 20, 319-20, 239-20);
   UG_WindowSetTitleText(&settings_window, "\xE6GUI Test Window");
   UG_WindowSetTitleTextFont(&settings_window, &FONT_8X12);
