@@ -151,6 +151,7 @@ const uint16_t console_bg(0x0000); // Windows 98+ #000000 --> RGB565
 const uint16_t console_fg(0xC618); // Windows XP+ #C0C0C0 --> RGB565 (98 used #A8A8A8)
 const uint16_t background_color(ILI9341_YELLOW);
 const uint16_t button_text_disabled(C_GRAY);
+const uint16_t selected_color(C_GREEN);
 
 // Icons
 const char fa_icon_settings[] = "u"; // Sliders
@@ -742,7 +743,7 @@ void settings_callback(UG_MESSAGE* msg)
     case BTN_ID_0:
       UG_DriverEnable(DRIVER_DRAW_LINE);
       UG_DriverEnable(DRIVER_FILL_FRAME);
-      UG_ButtonSetBackColor(&settings_window, BTN_ID_0, C_GREEN);
+      UG_ButtonSetBackColor(&settings_window, BTN_ID_0, selected_color);
       UG_ButtonSetBackColor(&settings_window, BTN_ID_1, UG_WindowGetBackColor(&settings_window));
       break;
 
@@ -750,7 +751,7 @@ void settings_callback(UG_MESSAGE* msg)
       UG_DriverDisable(DRIVER_DRAW_LINE);
       UG_DriverDisable(DRIVER_FILL_FRAME);
       UG_ButtonSetBackColor(&settings_window, BTN_ID_0, UG_WindowGetBackColor(&settings_window));
-      UG_ButtonSetBackColor(&settings_window, BTN_ID_1, C_GREEN);
+      UG_ButtonSetBackColor(&settings_window, BTN_ID_1, selected_color);
       break;
 
     case BTN_ID_2:
