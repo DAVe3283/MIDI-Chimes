@@ -8338,7 +8338,7 @@ UG_RESULT UG_ProgressbarSetBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR bc )
 
    prb = (UG_PROGRESSBAR*)(obj->data);
    prb->bc = bc;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+   obj->state |= OBJ_STATE_UPDATE;
 
    return UG_RESULT_OK;
 }
@@ -8353,7 +8353,7 @@ UG_RESULT UG_ProgressbarSetText( UG_WINDOW* wnd, UG_U8 id, const char* str )
 
    prb = (UG_PROGRESSBAR*)(obj->data);
    prb->str = str;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+   obj->state |= OBJ_STATE_UPDATE;
 
    return UG_RESULT_OK;
 }
@@ -8368,7 +8368,7 @@ UG_RESULT UG_ProgressbarSetFont( UG_WINDOW* wnd, UG_U8 id, const UG_FONT* font )
 
    prb = (UG_PROGRESSBAR*)(obj->data);
    prb->font = font;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+   obj->state |= OBJ_STATE_UPDATE;
 
    return UG_RESULT_OK;
 }
@@ -8383,7 +8383,7 @@ UG_RESULT UG_ProgressbarSetHSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 hs )
 
    prb = (UG_PROGRESSBAR*)(obj->data);
    prb->h_space = hs;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+   obj->state |= OBJ_STATE_UPDATE;
 
    return UG_RESULT_OK;
 }
@@ -8398,7 +8398,7 @@ UG_RESULT UG_ProgressbarSetVSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 vs )
 
    prb = (UG_PROGRESSBAR*)(obj->data);
    prb->v_space = vs;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+   obj->state |= OBJ_STATE_UPDATE;
 
    return UG_RESULT_OK;
 }
@@ -8413,7 +8413,7 @@ UG_RESULT UG_ProgressbarSetAlignment( UG_WINDOW* wnd, UG_U8 id, UG_U8 align )
 
    prb = (UG_PROGRESSBAR*)(obj->data);
    prb->align = align;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+   obj->state |= OBJ_STATE_UPDATE;
 
    return UG_RESULT_OK;
 }
@@ -8528,7 +8528,10 @@ void _UG_ProgressbarUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
    UG_PROGRESSBAR* prb;
    UG_AREA a;
    UG_TEXT txt;
-   UG_U8 d;
+   UG_U8 d = 1; // Progress bar border is 1 px (2D only)
+   UG_S16 w; // Total width of progress bar
+   UG_S16 p; // Width of progress portion of bar
+   UG_S16 b; // Width of background portion of bar
 
    /* Get object-specific data */
    prb = (UG_PROGRESSBAR*)(obj->data);
@@ -8560,38 +8563,42 @@ void _UG_ProgressbarUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
             _UG_SendObjectPrerenderEvent(wnd, obj);
 #endif
 
-            /* 3D or 2D style? */
-            d = ( prb->style & BTN_STYLE_3D )? 3:1;
+            /* Draw Border */
+            UG_DrawFrame(obj->a_abs.xs, obj->a_abs.ys, obj->a_abs.xe, obj->a_abs.ye, prb->fc);
 
-            // Draw background field and frame
-            if ( !(prb->style & BTN_STYLE_NO_FILL) )
-               UG_FillFrame(obj->a_abs.xs, obj->a_abs.ys, obj->a_abs.xe, obj->a_abs.ye, prb->fc);
-               UG_FillFrame(obj->a_abs.xs+d, obj->a_abs.ys+d, obj->a_abs.xe-d, obj->a_abs.ye-d, prb->bc);
-
-            // Draw bar
-            UG_U8 width = (prb->current * (obj->a_abs.xe-obj->a_abs.xs-(2*d))) / UG_PROGRESSBAR_MAX;
-            UG_FillFrame(obj->a_abs.xs+d, obj->a_abs.ys+d, obj->a_abs.xs+d+width, obj->a_abs.ye-d, prb->barc);
-
-            /* Draw text */
-            // Same background and foreground colors indicates transparent background
-            txt.bc = prb->fc;
-            txt.fc = prb->fc;
-
-            txt.a.xs = obj->a_abs.xs;
-            txt.a.ys = obj->a_abs.ys;
-            txt.a.xe = obj->a_abs.xe;
-            txt.a.ye = obj->a_abs.ye;
-            txt.align = prb->align;
-            txt.font = prb->font;
-            txt.h_space = prb->h_space;
-            txt.v_space = prb->v_space;
-            txt.str = prb->str;
-            _UG_PutText( &txt );
             obj->state &= ~OBJ_STATE_REDRAW;
 #ifdef USE_POSTRENDER_EVENT
             _UG_SendObjectPostrenderEvent(wnd, obj);
 #endif
          }
+
+         /* Draw Progress Bar */
+         w = obj->a_abs.xe - obj->a_abs.xs - (2 * d);
+         p = prb->current * w / UG_PROGRESSBAR_MAX;
+         b = w - p;
+         if (p)
+         {
+            UG_FillFrame(obj->a_abs.xs + d, obj->a_abs.ys + d, obj->a_abs.xs + d + p, obj->a_abs.ye - d, prb->barc);
+            p++;
+         }
+         if (b)
+            UG_FillFrame(obj->a_abs.xs + d + p, obj->a_abs.ys + d, obj->a_abs.xe - d, obj->a_abs.ye - d, prb->bc);
+
+         /* Draw text */
+         /* Same background and foreground colors indicates transparent background */
+         txt.bc = prb->fc;
+         txt.fc = prb->fc;
+
+         txt.a.xs = obj->a_abs.xs;
+         txt.a.ys = obj->a_abs.ys;
+         txt.a.xe = obj->a_abs.xe;
+         txt.a.ye = obj->a_abs.ye;
+         txt.align = prb->align;
+         txt.font = prb->font;
+         txt.h_space = prb->h_space;
+         txt.v_space = prb->v_space;
+         txt.str = prb->str;
+         _UG_PutText( &txt );
       }
       else
       {
@@ -8626,7 +8633,7 @@ UG_RESULT UG_ProgressbarSetBarColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR barc )
 
    prb = (UG_PROGRESSBAR*)(obj->data);
    prb->barc = barc;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+   obj->state |= OBJ_STATE_UPDATE;
 
    return UG_RESULT_OK;
 }
@@ -8641,7 +8648,7 @@ UG_RESULT UG_ProgressbarSetValue( UG_WINDOW* wnd, UG_U8 id, UG_U8 val )
 
    prb = (UG_PROGRESSBAR*)(obj->data);
    prb->current = val;
-   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+   obj->state |= OBJ_STATE_UPDATE;
 
    return UG_RESULT_OK;
 }
