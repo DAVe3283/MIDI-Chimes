@@ -54,6 +54,7 @@
  void _UG_WindowUpdate( UG_WINDOW* wnd );
  UG_RESULT _UG_WindowClear( UG_WINDOW* wnd );
  void _UG_TextboxUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
+ void _UG_ProgressbarUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
  void _UG_ButtonUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
  void _UG_CheckboxUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
  void _UG_ImageUpdate(UG_WINDOW* wnd, UG_OBJECT* obj);
@@ -5265,14 +5266,10 @@ void _UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const 
 
    switch ( bt )
    {
-      case 0xF6: bt = 0x94; break; // ö
-      case 0xD6: bt = 0x99; break; // Ö
-      case 0xFC: bt = 0x81; break; // ü
-      case 0xDC: bt = 0x9A; break; // Ü
-      case 0xE4: bt = 0x84; break; // ä
-      case 0xC4: bt = 0x8E; break; // Ä
-      case 0xB5: bt = 0xE6; break; // µ
-      case 0xB0: bt = 0xF8; break; // °
+      case 0xF6: bt = 0x94; break; // ?
+      case 0xD6: bt = 0x99; break; // ?      case 0xFC: bt = 0x81; break; // ?
+      case 0xDC: bt = 0x9A; break; // ?      case 0xE4: bt = 0x84; break; // ?      case 0xC4: bt = 0x8E; break; // ?      case 0xB5: bt = 0xE6; break; // ?
+      case 0xB0: bt = 0xF8; break; // ?
    }
 
    if (bt < font->start_char || bt > font->end_char) return;
@@ -8235,3 +8232,426 @@ void _UG_ImageUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
 }
 
 
+/* -------------------------------------------------------------------------------- */
+/* -- PROGRESSBAR FUNCTIONS                                                      -- */
+/* -------------------------------------------------------------------------------- */
+UG_RESULT UG_ProgressbarCreate( UG_WINDOW* wnd, UG_PROGRESSBAR* prb, UG_U8 id, UG_S16 xs, UG_S16 ys, UG_S16 xe, UG_S16 ye )
+{
+   UG_OBJECT* obj;
+
+   obj = _UG_GetFreeObject( wnd );
+   if ( obj == NULL ) return UG_RESULT_FAIL;
+
+   /* Initialize object-specific parameters */
+   prb->str = NULL;
+   if (gui != NULL) prb->font = &gui->font;
+   else prb->font = NULL;
+   prb->style = 0; /* reserved */
+   prb->fc = wnd->fc;
+   prb->bc = wnd->bc;
+   prb->barc = wnd->bc;  // bar color defaults to background color
+   prb->align = ALIGN_CENTER;
+   prb->h_space = 0;
+   prb->v_space = 0;
+   prb->current = UG_PROGRESSBAR_MAX/2;  // Default to 1/2 full
+
+   /* Initialize standard object parameters */
+   obj->update = _UG_ProgressbarUpdate;
+   obj->touch_state = OBJ_TOUCH_STATE_INIT;
+   obj->type = OBJ_TYPE_PROGRESSBAR;
+   obj->event = OBJ_EVENT_NONE;
+   obj->a_rel.xs = xs;
+   obj->a_rel.ys = ys;
+   obj->a_rel.xe = xe;
+   obj->a_rel.ye = ye;
+   obj->a_abs.xs = -1;
+   obj->a_abs.ys = -1;
+   obj->a_abs.xe = -1;
+   obj->a_abs.ye = -1;
+   obj->id = id;
+   obj->state |= OBJ_STATE_VISIBLE | OBJ_STATE_REDRAW | OBJ_STATE_VALID;
+   obj->data = (void*)prb;
+
+   /* Update function: Do your thing! */
+   obj->state &= ~OBJ_STATE_FREE;
+
+   return UG_RESULT_OK;
+}
+
+UG_RESULT UG_ProgressbarDelete( UG_WINDOW* wnd, UG_U8 id )
+{
+   return _UG_DeleteObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+}
+
+UG_RESULT UG_ProgressbarShow( UG_WINDOW* wnd, UG_U8 id )
+{
+   UG_OBJECT* obj=NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj == NULL ) return UG_RESULT_FAIL;
+
+   obj->state |= OBJ_STATE_VISIBLE;
+   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+
+   return UG_RESULT_OK;
+}
+
+UG_RESULT UG_ProgressbarHide( UG_WINDOW* wnd, UG_U8 id )
+{
+   UG_OBJECT* obj=NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj == NULL ) return UG_RESULT_FAIL;
+
+   obj->state &= ~OBJ_STATE_VISIBLE;
+   obj->state |= OBJ_STATE_UPDATE;
+
+   return UG_RESULT_OK;
+}
+
+UG_RESULT UG_ProgressbarSetForeColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR fc )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj == NULL ) return UG_RESULT_FAIL;
+
+   prb = (UG_PROGRESSBAR*)(obj->data);
+   prb->fc = fc;
+   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+
+   return UG_RESULT_OK;
+}
+
+UG_RESULT UG_ProgressbarSetBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR bc )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj == NULL ) return UG_RESULT_FAIL;
+
+   prb = (UG_PROGRESSBAR*)(obj->data);
+   prb->bc = bc;
+   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+
+   return UG_RESULT_OK;
+}
+
+UG_RESULT UG_ProgressbarSetText( UG_WINDOW* wnd, UG_U8 id, const char* str )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj == NULL ) return UG_RESULT_FAIL;
+
+   prb = (UG_PROGRESSBAR*)(obj->data);
+   prb->str = str;
+   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+
+   return UG_RESULT_OK;
+}
+
+UG_RESULT UG_ProgressbarSetFont( UG_WINDOW* wnd, UG_U8 id, const UG_FONT* font )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj == NULL ) return UG_RESULT_FAIL;
+
+   prb = (UG_PROGRESSBAR*)(obj->data);
+   prb->font = font;
+   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+
+   return UG_RESULT_OK;
+}
+
+UG_RESULT UG_ProgressbarSetHSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 hs )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj == NULL ) return UG_RESULT_FAIL;
+
+   prb = (UG_PROGRESSBAR*)(obj->data);
+   prb->h_space = hs;
+   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+
+   return UG_RESULT_OK;
+}
+
+UG_RESULT UG_ProgressbarSetVSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 vs )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj == NULL ) return UG_RESULT_FAIL;
+
+   prb = (UG_PROGRESSBAR*)(obj->data);
+   prb->v_space = vs;
+   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+
+   return UG_RESULT_OK;
+}
+
+UG_RESULT UG_ProgressbarSetAlignment( UG_WINDOW* wnd, UG_U8 id, UG_U8 align )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj == NULL ) return UG_RESULT_FAIL;
+
+   prb = (UG_PROGRESSBAR*)(obj->data);
+   prb->align = align;
+   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+
+   return UG_RESULT_OK;
+}
+
+UG_COLOR UG_ProgressbarGetForeColor( UG_WINDOW* wnd, UG_U8 id )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+   UG_COLOR c = C_BLACK;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj != NULL )
+   {
+      prb = (UG_PROGRESSBAR*)(obj->data);
+      c = prb->fc;
+   }
+   return c;
+}
+
+UG_COLOR UG_ProgressbarGetBackColor( UG_WINDOW* wnd, UG_U8 id )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+   UG_COLOR c = C_BLACK;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj != NULL )
+   {
+      prb = (UG_PROGRESSBAR*)(obj->data);
+      c = prb->bc;
+   }
+   return c;
+}
+
+const char* UG_ProgressbarGetText( UG_WINDOW* wnd, UG_U8 id )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+   const char* str = NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj != NULL )
+   {
+      prb = (UG_PROGRESSBAR*)(obj->data);
+      str = prb->str;
+   }
+   return str;
+}
+
+UG_FONT* UG_ProgressbarGetFont( UG_WINDOW* wnd, UG_U8 id )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+   UG_FONT* font = NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj != NULL )
+   {
+      prb = (UG_PROGRESSBAR*)(obj->data);
+      font = (UG_FONT*)prb->font;
+   }
+   return font;
+}
+
+UG_S8 UG_ProgressbarGetHSpace( UG_WINDOW* wnd, UG_U8 id )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+   UG_S8 hs = 0;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj != NULL )
+   {
+      prb = (UG_PROGRESSBAR*)(obj->data);
+      hs = prb->h_space;
+   }
+   return hs;
+}
+
+UG_S8 UG_ProgressbarGetVSpace( UG_WINDOW* wnd, UG_U8 id )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+   UG_S8 vs = 0;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj != NULL )
+   {
+      prb = (UG_PROGRESSBAR*)(obj->data);
+      vs = prb->v_space;
+   }
+   return vs;
+}
+
+UG_U8 UG_ProgressbarGetAlignment( UG_WINDOW* wnd, UG_U8 id )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+   UG_U8 align = 0;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj != NULL )
+   {
+      prb = (UG_PROGRESSBAR*)(obj->data);
+      align = prb->align;
+   }
+   return align;
+}
+
+void _UG_ProgressbarUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
+{
+   UG_PROGRESSBAR* prb;
+   UG_AREA a;
+   UG_TEXT txt;
+   UG_U8 d;
+
+   /* Get object-specific data */
+   prb = (UG_PROGRESSBAR*)(obj->data);
+
+   /* -------------------------------------------------- */
+   /* Object touch section                               */
+   /* -------------------------------------------------- */
+
+   /* TODO: Add touch support to progress bar */
+
+   /* -------------------------------------------------- */
+   /* Object update section                              */
+   /* -------------------------------------------------- */
+   if ( obj->state & OBJ_STATE_UPDATE )
+   {
+      if ( obj->state & OBJ_STATE_VISIBLE )
+      {
+         /* Full redraw necessary? */
+         if ( obj->state & OBJ_STATE_REDRAW )
+         {
+            UG_WindowGetArea(wnd,&a);
+            obj->a_abs.xs = obj->a_rel.xs + a.xs;
+            obj->a_abs.ys = obj->a_rel.ys + a.ys;
+            obj->a_abs.xe = obj->a_rel.xe + a.xs;
+            obj->a_abs.ye = obj->a_rel.ye + a.ys;
+            if ( obj->a_abs.ye >= wnd->ye ) return;
+            if ( obj->a_abs.xe >= wnd->xe ) return;
+#ifdef USE_PRERENDER_EVENT
+            _UG_SendObjectPrerenderEvent(wnd, obj);
+#endif
+
+            /* 3D or 2D style? */
+            d = ( prb->style & BTN_STYLE_3D )? 3:1;
+
+            // Draw background field and frame
+            if ( !(prb->style & BTN_STYLE_NO_FILL) )
+               UG_FillFrame(obj->a_abs.xs, obj->a_abs.ys, obj->a_abs.xe, obj->a_abs.ye, prb->fc);
+	           UG_FillFrame(obj->a_abs.xs+d, obj->a_abs.ys+d, obj->a_abs.xe-d, obj->a_abs.ye-d, prb->bc);
+
+            // Draw bar
+            UG_U8 width = (prb->current * (obj->a_abs.xe-obj->a_abs.xs-(2*d))) / UG_PROGRESSBAR_MAX;
+            UG_FillFrame(obj->a_abs.xs+d, obj->a_abs.ys+d, obj->a_abs.xs+d+width, obj->a_abs.ye-d, prb->barc);
+
+            /* Draw text */
+            txt.bc = prb->bc;
+            txt.fc = prb->fc;
+
+            txt.a.xs = obj->a_abs.xs;
+            txt.a.ys = obj->a_abs.ys;
+            txt.a.xe = obj->a_abs.xe;
+            txt.a.ye = obj->a_abs.ye;
+            txt.align = prb->align;
+            txt.font = prb->font;
+            txt.h_space = prb->h_space;
+            txt.v_space = prb->v_space;
+            txt.str = prb->str;
+            _UG_PutText( &txt );
+            obj->state &= ~OBJ_STATE_REDRAW;
+#ifdef USE_POSTRENDER_EVENT
+            _UG_SendObjectPostrenderEvent(wnd, obj);
+#endif
+         }
+      }
+      else
+      {
+         UG_FillFrame(obj->a_abs.xs, obj->a_abs.ys, obj->a_abs.xe, obj->a_abs.ye, wnd->bc);
+      }
+      obj->state &= ~OBJ_STATE_UPDATE;
+   }
+}
+
+UG_COLOR UG_ProgressbarGetBarColor( UG_WINDOW* wnd, UG_U8 id )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+   UG_COLOR c = C_BLACK;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj != NULL )
+   {
+      prb = (UG_PROGRESSBAR*)(obj->data);
+      c = prb->barc;
+   }
+   return c;
+}
+
+UG_RESULT UG_ProgressbarSetBarColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR barc )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj == NULL ) return UG_RESULT_FAIL;
+
+   prb = (UG_PROGRESSBAR*)(obj->data);
+   prb->barc = barc;
+   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+
+   return UG_RESULT_OK;
+}
+
+UG_RESULT UG_ProgressbarSetValue( UG_WINDOW* wnd, UG_U8 id, UG_U8 val )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj == NULL ) return UG_RESULT_FAIL;
+
+   prb = (UG_PROGRESSBAR*)(obj->data);
+   prb->current = val;
+   obj->state |= OBJ_STATE_UPDATE | OBJ_STATE_REDRAW;
+
+   return UG_RESULT_OK;
+}
+
+UG_U8 UG_ProgressbarGetValue( UG_WINDOW* wnd, UG_U8 id )
+{
+   UG_OBJECT* obj=NULL;
+   UG_PROGRESSBAR* prb=NULL;
+   UG_U8 val = 0;
+
+   obj = _UG_SearchObject( wnd, OBJ_TYPE_PROGRESSBAR, id );
+   if ( obj != NULL )
+   {
+      prb = (UG_PROGRESSBAR*)(obj->data);
+      val = prb->current;
+   }
+   return val;
+}

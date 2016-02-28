@@ -262,6 +262,7 @@ struct S_OBJECT
 #define OBJ_TYPE_TEXTBOX                              2
 #define OBJ_TYPE_IMAGE                                3
 #define OBJ_TYPE_CHECKBOX                             4
+#define OBJ_TYPE_PROGRESSBAR                          5
 
 /* Standard object events */
 #define OBJ_EVENT_NONE                                0
@@ -501,6 +502,51 @@ typedef struct
 #define TXB_ID_17                                     OBJ_ID_17
 #define TXB_ID_18                                     OBJ_ID_18
 #define TXB_ID_19                                     OBJ_ID_19
+
+
+/* -------------------------------------------------------------------------------- */
+/* -- PROGRESSBAR OBJECT                                                         -- */
+/* -------------------------------------------------------------------------------- */
+// Maximum value for progress bar. Must fit in a UG_U8
+#define UG_PROGRESSBAR_MAX 100
+
+/* Progresss Bar structure */
+typedef struct
+{
+   const char* str;
+   const UG_FONT* font;
+   UG_U8 style;
+   UG_COLOR fc;
+   UG_COLOR bc;
+   UG_COLOR barc;
+   UG_U8 align;
+   UG_S8 h_space;
+   UG_S8 v_space;
+   UG_U8 current;
+} UG_PROGRESSBAR;
+
+/* Default progrerss bar IDs */
+#define PRB_ID_0                                      OBJ_ID_0
+#define PRB_ID_1                                      OBJ_ID_1
+#define PRB_ID_2                                      OBJ_ID_2
+#define PRB_ID_3                                      OBJ_ID_3
+#define PRB_ID_4                                      OBJ_ID_4
+#define PRB_ID_5                                      OBJ_ID_5
+#define PRB_ID_6                                      OBJ_ID_6
+#define PRB_ID_7                                      OBJ_ID_7
+#define PRB_ID_8                                      OBJ_ID_8
+#define PRB_ID_9                                      OBJ_ID_9
+#define PRB_ID_10                                     OBJ_ID_10
+#define PRB_ID_11                                     OBJ_ID_11
+#define PRB_ID_12                                     OBJ_ID_12
+#define PRB_ID_13                                     OBJ_ID_13
+#define PRB_ID_14                                     OBJ_ID_14
+#define PRB_ID_15                                     OBJ_ID_15
+#define PRB_ID_16                                     OBJ_ID_16
+#define PRB_ID_17                                     OBJ_ID_17
+#define PRB_ID_18                                     OBJ_ID_18
+#define PRB_ID_19                                     OBJ_ID_19
+
 
 /* -------------------------------------------------------------------------------- */
 /* -- IMAGE OBJECT                                                               -- */
@@ -1048,6 +1094,29 @@ UG_RESULT UG_ImageShow( UG_WINDOW* wnd, UG_U8 id );
 UG_RESULT UG_ImageHide( UG_WINDOW* wnd, UG_U8 id );
 UG_RESULT UG_ImageSetBMP( UG_WINDOW* wnd, UG_U8 id, const UG_BMP* bmp );
 
+/* Progress bar functions */
+UG_RESULT UG_ProgressbarCreate( UG_WINDOW* wnd, UG_PROGRESSBAR* prb, UG_U8 id, UG_S16 xs, UG_S16 ys, UG_S16 xe, UG_S16 ye );
+UG_RESULT UG_ProgressbarDelete( UG_WINDOW* wnd, UG_U8 id );
+UG_RESULT UG_ProgressbarShow( UG_WINDOW* wnd, UG_U8 id );
+UG_RESULT UG_ProgressbarHide( UG_WINDOW* wnd, UG_U8 id );
+UG_RESULT UG_ProgressbarSetForeColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR fc );
+UG_RESULT UG_ProgressbarSetBackColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR bc );
+UG_RESULT UG_ProgressbarSetText( UG_WINDOW* wnd, UG_U8 id, const char* str );
+UG_RESULT UG_ProgressbarSetFont( UG_WINDOW* wnd, UG_U8 id, const UG_FONT* font );
+UG_RESULT UG_ProgressbarSetHSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 hs );
+UG_RESULT UG_ProgressbarSetVSpace( UG_WINDOW* wnd, UG_U8 id, UG_S8 vs );
+UG_RESULT UG_ProgressbarSetAlignment( UG_WINDOW* wnd, UG_U8 id, UG_U8 align );
+UG_COLOR UG_ProgressbarGetForeColor( UG_WINDOW* wnd, UG_U8 id );
+UG_COLOR UG_ProgressbarGetBackColor( UG_WINDOW* wnd, UG_U8 id );
+const char* UG_ProgressbarGetText( UG_WINDOW* wnd, UG_U8 id );
+UG_FONT* UG_ProgressbarGetFont( UG_WINDOW* wnd, UG_U8 id );
+UG_S8 UG_ProgressbarGetHSpace( UG_WINDOW* wnd, UG_U8 id );
+UG_S8 UG_ProgressbarGetVSpace( UG_WINDOW* wnd, UG_U8 id );
+UG_U8 UG_ProgressbarGetAlignment( UG_WINDOW* wnd, UG_U8 id );
 
+UG_RESULT UG_ProgressbarSetBarColor( UG_WINDOW* wnd, UG_U8 id, UG_COLOR barc );
+UG_COLOR UG_ProgressbarGetBarColor( UG_WINDOW* wnd, UG_U8 id );
+UG_RESULT UG_ProgressbarSetValue( UG_WINDOW* wnd, UG_U8 id, UG_U8 val );
+UG_U8 UG_ProgressbarGetValue( UG_WINDOW* wnd, UG_U8 id );
 
 #endif

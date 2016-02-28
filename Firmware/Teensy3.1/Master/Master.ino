@@ -46,7 +46,7 @@
 // -----------------------------------------------------------------------------
 
 // Comment this line out if using the resistive touchscreen layer
-//#define CAPACITIVE_TS
+#define CAPACITIVE_TS
 
 // -----------------------------------------------------------------------------
 // Includes
@@ -243,7 +243,7 @@ UG_WINDOW main_window;
 UG_BUTTON main_window_button_settings;
 UG_BUTTON main_window_button_vol_dn;
 UG_BUTTON main_window_button_vol_up;
-UG_TEXTBOX main_window_text_volume;
+UG_PROGRESSBAR main_window_prb_volume;
 UG_OBJECT main_window_buffer[MAX_OBJECTS];
 char volume_text_buffer[16] = { 0 };
 // TODO: this
@@ -633,7 +633,8 @@ void adjust_master_volume(int8_t change)
 
   // Update the text
   sprintf(volume_text_buffer, "Volume: %d%%", master_volume);
-  UG_TextboxSetText(&main_window, TXB_ID_0, volume_text_buffer);
+  UG_ProgressbarSetText(&main_window, PRB_ID_0, volume_text_buffer);
+  UG_ProgressbarSetValue(&main_window, PRB_ID_0, master_volume);
 }
 
 void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c)
@@ -708,14 +709,14 @@ void draw_main_window()
   UG_ButtonSetText(&main_window, BTN_ID_2, fa_icon_vol_up);
 
   // Volume text box
-  UG_TextboxCreate(&main_window, &main_window_text_volume, TXB_ID_0,
+  UG_ProgressbarCreate(&main_window, &main_window_prb_volume, TXB_ID_0,
     padding + button_size + padding,
     height - padding - button_size,
     width - padding - button_size - padding,
     height - padding);
-  UG_TextboxSetFont(&main_window, TXB_ID_0, &FONT_8X12);
-  UG_TextboxSetAlignment(&main_window, TXB_ID_0, ALIGN_CENTER);
-  UG_TextboxSetBackColor(&main_window, TXB_ID_0, C_RED);
+  UG_ProgressbarSetFont(&main_window, TXB_ID_0, &FONT_8X12);
+  UG_ProgressbarSetAlignment(&main_window, TXB_ID_0, ALIGN_CENTER);
+  UG_ProgressbarSetBarColor(&main_window, TXB_ID_0, C_RED);
   adjust_master_volume(0);
 }
 
