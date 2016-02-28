@@ -4949,13 +4949,13 @@ void UG_PutString( UG_S16 x, UG_S16 y, const char* str )
    while ( *str != 0 )
    {
       chr = *str++;
-	  if (chr < gui->font.start_char || chr > gui->font.end_char) continue;
+      if (chr < gui->font.start_char || chr > gui->font.end_char) continue;
       if ( chr == '\n' )
       {
          xp = gui->x_dim;
          continue;
       }
-	  cw = gui->font.widths ? gui->font.widths[chr - gui->font.start_char] : gui->font.char_width;
+      cw = gui->font.widths ? gui->font.widths[chr - gui->font.start_char] : gui->font.char_width;
 
       if ( xp + cw > gui->x_dim - 1 )
       {
@@ -4971,7 +4971,7 @@ void UG_PutString( UG_S16 x, UG_S16 y, const char* str )
 
 void UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc )
 {
-	_UG_PutChar(chr,x,y,fc,bc,&gui->font);
+    _UG_PutChar(chr,x,y,fc,bc,&gui->font);
 }
 
 void UG_ConsolePutString( const char* str )
@@ -5264,6 +5264,8 @@ void _UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const 
 
    bt = (UG_U8)chr;
 
+   //HACK: This appears to be codepage compatibility hackery. This is a terrible way to handle
+   // that
    switch ( bt )
    {
       case 0xF6: bt = 0x94; break; // ?
@@ -5284,56 +5286,57 @@ void _UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const 
    /* Is hardware acceleration available? */
    if ( gui->driver[DRIVER_FILL_AREA].state & DRIVER_ENABLED )
    {
-	   //(void(*)(UG_COLOR))
+       //(void(*)(UG_COLOR))
       push_pixel = ((void*(*)(UG_S16, UG_S16, UG_S16, UG_S16))gui->driver[DRIVER_FILL_AREA].driver)(x,y,x+actual_char_width-1,y+font->char_height-1);
-	   
+       
       if (font->font_type == FONT_TYPE_1BPP)
-	  {
-	      index = (bt - font->start_char)* font->char_height * bn;
-		  for( j=0;j<font->char_height;j++ )
-		  {
-			 c=actual_char_width;
-			 for( i=0;i<bn;i++ )
-			 {
-				b = font->p[index++];
-				for( k=0;(k<8) && c;k++ )
-				{
-				   if( b & 0x01 )
-				   {
-					  push_pixel(fc);
-				   }
-				   else
-				   {
-					  push_pixel(bc);
-				   }
-				   b >>= 1;
-				   c--;
-				}
-			 }
-	 	 }
-	  }
-	  else if (font->font_type == FONT_TYPE_8BPP)
-	  {
-		   index = (bt - font->start_char)* font->char_height * font->char_width;
-		   for( j=0;j<font->char_height;j++ )
-		   {
-			  for( i=0;i<actual_char_width;i++ )
-			  {
-				 b = font->p[index++];
-				 color = ((((fc & 0xFF) * b + (bc & 0xFF) * (256 - b)) >> 8) & 0xFF) | // Blue component
-				         ((((fc & 0xFF00) * b + (bc & 0xFF00) * (256 - b)) >> 8)  & 0xFF00) | // Green component
-				         ((((fc & 0xFF0000) * b + (bc & 0xFF0000) * (256 - b)) >> 8) & 0xFF0000); // Red component
-				 push_pixel(color);
-			  }
-			  index += font->char_width - actual_char_width;
-		  }
-	  }
+      {
+          index = (bt - font->start_char)* font->char_height * bn;
+          for( j=0;j<font->char_height;j++ )
+          {
+             c=actual_char_width;
+             for( i=0;i<bn;i++ )
+             {
+                b = font->p[index++];
+                for( k=0;(k<8) && c;k++ )
+                {
+                   if( b & 0x01 )
+                   {
+                      push_pixel(fc);
+                   }
+                   else if(bc != fc)  // Only render background pixels if they differ from the foreground
+                   {
+                      push_pixel(bc);
+                   }
+                   b >>= 1;
+                   c--;
+                }
+             }
+         }
+      }
+      else if (font->font_type == FONT_TYPE_8BPP)
+      {
+           index = (bt - font->start_char)* font->char_height * font->char_width;
+           for( j=0;j<font->char_height;j++ )
+           {
+              for( i=0;i<actual_char_width;i++ )
+              {
+                 UG_U8 bgmask = (bc != fc) ? 0xFFFFFF : 0x000000;
+                 b = font->p[index++];
+                 color = ((((fc & 0x0000FF) * b + (bc & 0x0000FF & bgmask) * (256 - b)) >> 8) & 0x0000FF) |  // Blue component
+                         ((((fc & 0x00FF00) * b + (bc & 0x00FF00 & bgmask) * (256 - b)) >> 8) & 0x00FF00) |  // Green component
+                         ((((fc & 0xFF0000) * b + (bc & 0xFF0000 & bgmask) * (256 - b)) >> 8) & 0xFF0000);   // Red component
+                 push_pixel(color);
+              }
+              index += font->char_width - actual_char_width;
+          }
+      }
    }
    else
    {
-	   /*Not accelerated output*/
-	   if (font->font_type == FONT_TYPE_1BPP)
-	   {
+       /*Not accelerated output*/
+       if (font->font_type == FONT_TYPE_1BPP)
+       {
          index = (bt - font->start_char)* font->char_height * bn;
          for( j=0;j<font->char_height;j++ )
          {
@@ -5348,7 +5351,7 @@ void _UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const 
                {
                   gui->pset(xo,yo,fc);
                }
-               else
+               else if(bc != fc)
                {
                   gui->pset(xo,yo,bc);
                }
@@ -5368,10 +5371,11 @@ void _UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const 
             xo = x;
             for( i=0;i<actual_char_width;i++ )
             {
+               UG_U8 bgmask = (bc != fc) ? 0xFFFFFF : 0x000000;
                b = font->p[index++];
-               color = ((((fc & 0xFF) * b + (bc & 0xFF) * (256 - b)) >> 8) & 0xFF) | // Blue component
-                       ((((fc & 0xFF00) * b + (bc & 0xFF00) * (256 - b)) >> 8)  & 0xFF00) | // Green component
-                       ((((fc & 0xFF0000) * b + (bc & 0xFF0000) * (256 - b)) >> 8) & 0xFF0000); // Red component
+               color = ((((fc & 0x0000FF) * b + (bc & 0x0000FF & bgmask) * (256 - b)) >> 8) & 0x0000FF) |  // Blue component
+                       ((((fc & 0x00FF00) * b + (bc & 0x00FF00 & bgmask) * (256 - b)) >> 8) & 0x00FF00) |  // Green component
+                       ((((fc & 0xFF0000) * b + (bc & 0xFF0000 & bgmask) * (256 - b)) >> 8) & 0xFF0000);   // Red component
                gui->pset(xo,yo,color);
                xo++;
             }
@@ -5679,28 +5683,28 @@ void _UG_DrawObjectFrame( UG_S16 xs, UG_S16 ys, UG_S16 xe, UG_S16 ye, UG_COLOR* 
 #ifdef USE_PRERENDER_EVENT
 void _UG_SendObjectPrerenderEvent(UG_WINDOW *wnd,UG_OBJECT *obj)
 {
-	UG_MESSAGE msg;
-	msg.event = OBJ_EVENT_PRERENDER;
-	msg.type = MSG_TYPE_OBJECT;
-	msg.id = obj->type;
-	msg.sub_id = obj->id;
-	msg.src = obj;
+    UG_MESSAGE msg;
+    msg.event = OBJ_EVENT_PRERENDER;
+    msg.type = MSG_TYPE_OBJECT;
+    msg.id = obj->type;
+    msg.sub_id = obj->id;
+    msg.src = obj;
 
-	wnd->cb(&msg);
+    wnd->cb(&msg);
 }
 #endif
 
 #ifdef USE_POSTRENDER_EVENT
 void _UG_SendObjectPostrenderEvent(UG_WINDOW *wnd,UG_OBJECT *obj)
 {
-	UG_MESSAGE msg;
-	msg.event = OBJ_EVENT_POSTRENDER;
-	msg.type = MSG_TYPE_OBJECT;
-	msg.id = obj->type;
-	msg.sub_id = obj->id;
-	msg.src = obj;
+    UG_MESSAGE msg;
+    msg.event = OBJ_EVENT_POSTRENDER;
+    msg.type = MSG_TYPE_OBJECT;
+    msg.id = obj->type;
+    msg.sub_id = obj->id;
+    msg.src = obj;
 
-	wnd->cb(&msg);
+    wnd->cb(&msg);
 }
 #endif
 
@@ -8562,14 +8566,15 @@ void _UG_ProgressbarUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
             // Draw background field and frame
             if ( !(prb->style & BTN_STYLE_NO_FILL) )
                UG_FillFrame(obj->a_abs.xs, obj->a_abs.ys, obj->a_abs.xe, obj->a_abs.ye, prb->fc);
-	           UG_FillFrame(obj->a_abs.xs+d, obj->a_abs.ys+d, obj->a_abs.xe-d, obj->a_abs.ye-d, prb->bc);
+               UG_FillFrame(obj->a_abs.xs+d, obj->a_abs.ys+d, obj->a_abs.xe-d, obj->a_abs.ye-d, prb->bc);
 
             // Draw bar
             UG_U8 width = (prb->current * (obj->a_abs.xe-obj->a_abs.xs-(2*d))) / UG_PROGRESSBAR_MAX;
             UG_FillFrame(obj->a_abs.xs+d, obj->a_abs.ys+d, obj->a_abs.xs+d+width, obj->a_abs.ye-d, prb->barc);
 
             /* Draw text */
-            txt.bc = prb->bc;
+            // Same background and foreground colors indicates transparent background
+            txt.bc = prb->fc;
             txt.fc = prb->fc;
 
             txt.a.xs = obj->a_abs.xs;
