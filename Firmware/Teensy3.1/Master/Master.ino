@@ -604,37 +604,47 @@ void adjust_master_volume(int8_t change)
   // Adjust the volume
   master_volume += change;
 
+  // Get current button setup
+  const UG_COLOR w_fg(UG_WindowGetForeColor(&main_window));
+  const UG_COLOR d_fg(UG_ButtonGetForeColor(&main_window, BTN_ID_1));
+  const UG_U8    d_st(UG_ButtonGetStyle(&main_window, BTN_ID_1));
+  const UG_COLOR u_fg(UG_ButtonGetForeColor(&main_window, BTN_ID_2));
+  const UG_U8    u_st(UG_ButtonGetStyle(&main_window, BTN_ID_2));
+
   // Limit range to 0-100, enable/disable buttons
   if (master_volume >= 100)
   {
     master_volume = 100;
 
     // Disable volume up button
-    UG_ButtonSetForeColor(&main_window, BTN_ID_2, button_text_disabled);
-    UG_ButtonSetStyle(&main_window, BTN_ID_2, BTN_STYLE_2D);
+    if (u_fg != button_text_disabled) { UG_ButtonSetForeColor(&main_window, BTN_ID_2, button_text_disabled); }
+    if (u_st != BTN_STYLE_2D)         { UG_ButtonSetStyle(&main_window, BTN_ID_2, BTN_STYLE_2D); }
   }
   else if (master_volume <= 0)
   {
     master_volume = 0;
 
     // Disable volume down button
-    UG_ButtonSetForeColor(&main_window, BTN_ID_1, button_text_disabled);
-    UG_ButtonSetStyle(&main_window, BTN_ID_1, BTN_STYLE_2D);
+    if (d_fg != button_text_disabled) { UG_ButtonSetForeColor(&main_window, BTN_ID_1, button_text_disabled); }
+    if (d_st != BTN_STYLE_2D)         { UG_ButtonSetStyle(&main_window, BTN_ID_1, BTN_STYLE_2D); }
   }
   else
   {
     // Enable both buttons
-    const UG_COLOR fg(UG_WindowGetForeColor(&main_window));
-    UG_ButtonSetForeColor(&main_window, BTN_ID_1, fg);
-    UG_ButtonSetStyle(&main_window, BTN_ID_1, BTN_STYLE_3D);
-    UG_ButtonSetForeColor(&main_window, BTN_ID_2, fg);
-    UG_ButtonSetStyle(&main_window, BTN_ID_2, BTN_STYLE_3D);
+    if (d_fg != w_fg         ) { UG_ButtonSetForeColor(&main_window, BTN_ID_1, w_fg); }
+    if (d_st != BTN_STYLE_3D ) { UG_ButtonSetStyle(&main_window, BTN_ID_1, BTN_STYLE_3D); }
+    if (u_fg != w_fg         ) { UG_ButtonSetForeColor(&main_window, BTN_ID_2, w_fg); }
+    if (u_st != BTN_STYLE_3D ) { UG_ButtonSetStyle(&main_window, BTN_ID_2, BTN_STYLE_3D); }
   }
 
   // Update the text
-  sprintf(volume_text_buffer, "Volume: %d%%", master_volume);
-  UG_ProgressbarSetText(&main_window, PRB_ID_0, volume_text_buffer);
-  UG_ProgressbarSetValue(&main_window, PRB_ID_0, master_volume);
+  const UG_U8 last_vol(UG_ProgressbarGetValue(&main_window, PRB_ID_0));
+  if (last_vol != master_volume)
+  {
+    sprintf(volume_text_buffer, "Volume: %d%%", master_volume);
+    UG_ProgressbarSetText(&main_window, PRB_ID_0, volume_text_buffer);
+    UG_ProgressbarSetValue(&main_window, PRB_ID_0, master_volume);
+  }
 }
 
 void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c)
