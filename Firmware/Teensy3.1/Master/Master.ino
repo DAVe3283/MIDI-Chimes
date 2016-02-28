@@ -46,7 +46,7 @@
 // -----------------------------------------------------------------------------
 
 // Comment this line out if using the resistive touchscreen layer
-#define CAPACITIVE_TS
+//#define CAPACITIVE_TS
 
 // -----------------------------------------------------------------------------
 // Includes
@@ -56,6 +56,13 @@
 #include <SPI.h>
 #include <i2c_t3.h>
 #include <ILI9341_t3.h>
+#include <SdFat.h>
+
+// GUI
+extern "C"
+{
+  #include "ugui.h"
+}
 
 // Touchscreen driver
 #ifdef CAPACITIVE_TS
@@ -65,12 +72,16 @@
 #endif
 
 // Fonts
-#include <font_LiberationMono.h>
-#include <font_LiberationSans.h>
+// #include <font_LiberationMono.h>
+// #include <font_LiberationSans.h>
 // #include <font_LiberationSansBold.h>
 // #include <font_LiberationSansItalic.h>
 // #include <font_LiberationSansBoldItalic.h>
-#include <font_AwesomeF000.h>
+// #include <font_AwesomeF000.h>
+#include "FontAwesome_mod_50X40.h"
+
+// Blue Screen of Death :P
+#include "bsod_win10.h"
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -136,14 +147,15 @@ const uint16_t ts_max_y(4000);
 const uint16_t blink_time(20000); // microseconds
 
 // Graphics settings
-const uint16_t background_color(ILI9341_BLUE);
-const uint16_t text_color(ILI9341_WHITE);
-const uint16_t button_color(ILI9341_WHITE);
-const uint16_t button_border(ILI9341_BLACK);
-const uint16_t button_text(button_border);
-const uint16_t button_text_disabled(ILI9341_LIGHTGREY);
-const  int16_t button_radius(5);
-const uint16_t volume_color(ILI9341_RED);
+const uint16_t console_bg(0x0000); // Windows 98+ #000000 --> RGB565
+const uint16_t console_fg(0xC618); // Windows XP+ #C0C0C0 --> RGB565 (98 used #A8A8A8)
+const uint16_t background_color(ILI9341_YELLOW);
+const uint16_t button_text_disabled(C_GRAY);
+
+// Icons
+const char fa_icon_settings[] = "u"; // Sliders
+const char fa_icon_vol_dn[] = "F"; // Volume Down
+const char fa_icon_vol_up[] = "G"; // Volume Up
 
 // DEBUG: volume button sizes (until I make a class and do this right)
 const int16_t button_vol_d_x(  5);
@@ -176,13 +188,20 @@ void send_chime(const uint8_t& address, const uint8_t& channel, const uint16_t& 
 // Gets the slave address and channel on the slave for a given MIDI note
 bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out, uint8_t& slave_channel_out);
 
-// Master Volume
-void draw_master_volume();
-void update_master_volume();
+// Adjust Master Volume
+void adjust_master_volume(int8_t change);
 
-// DEBUG / TESTING
-void glyph_test();
-bool hit_test(const int16_t& x, const int16_t& y, const int16_t& _x, const int16_t& _y, const int16_t& _w, const int16_t& _h);
+// µGUI
+void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c);
+// µGUI Hardware Acceleration
+UG_RESULT _HW_DrawLine(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c);
+UG_RESULT _HW_FillFrame(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c);
+// Main Window
+void draw_main_window();
+void main_callback(UG_MESSAGE* msg);
+// Settings Window
+// void draw_settings_window();
+// void settings_callback(UG_MESSAGE* msg);
 
 
 // -----------------------------------------------------------------------------
@@ -191,7 +210,7 @@ bool hit_test(const int16_t& x, const int16_t& y, const int16_t& _x, const int16
 
 // User settings
 uint8_t our_channel(0); // Current channel (1-16, 0 means play all)
-uint8_t master_volume(100); // Master volume (0-100, 0 means mute, steps of 10)
+int8_t master_volume(100); // Master volume (0-100, 0 means mute, steps of 10)
 bool override_velocity(false); // Override velocity to master volume (true), or scale it by master volume (false)
 
 // Timers
@@ -202,6 +221,11 @@ elapsedMicros message_blink_timer;
 HardwareSerial    ser = HardwareSerial();
 // TODO: hardware MIDI
 
+// SD Card
+SdFat sd;
+SdFile file;
+SdFile dirFile;
+
 // Touch Screen
 ILI9341_t3 tft = ILI9341_t3(lcd_cs_pin, lcd_dc_pin, lcd_reset_pin, spi_mosi_pin, spi_sck_pin, spi_miso_pin); // TFT LCD
 #ifdef CAPACITIVE_TS
@@ -209,6 +233,62 @@ ILI9341_t3 tft = ILI9341_t3(lcd_cs_pin, lcd_dc_pin, lcd_reset_pin, spi_mosi_pin,
 #else
   Adafruit_STMPE610 ts = Adafruit_STMPE610(touch_cs_pin); // Touch sensor
 #endif
+
+// µGUI
+UG_GUI gui;
+#define MAX_OBJECTS 10
+// ^^ temp #define
+// Main Window
+UG_WINDOW main_window;
+UG_BUTTON main_window_button_settings;
+UG_BUTTON main_window_button_vol_dn;
+UG_BUTTON main_window_button_vol_up;
+UG_TEXTBOX main_window_text_volume;
+UG_OBJECT main_window_buffer[MAX_OBJECTS];
+char volume_text_buffer[16] = { 0 };
+// TODO: this
+UG_WINDOW window0;
+UG_BUTTON button0;
+UG_BUTTON button1;
+UG_BUTTON button2;
+UG_BUTTON button3;
+UG_OBJECT obj_buff_window0[MAX_OBJECTS];
+void window0_callback(UG_MESSAGE* msg)
+{
+  if ((msg->type == MSG_TYPE_OBJECT) &&
+      (msg->id == OBJ_TYPE_BUTTON) &&
+      (msg->event == BTN_EVENT_CLICKED))
+  {
+    switch (msg->sub_id)
+    {
+    case BTN_ID_0:
+      UG_DriverEnable(DRIVER_DRAW_LINE);
+      UG_DriverEnable(DRIVER_FILL_FRAME);
+      UG_ButtonSetBackColor(&window0, BTN_ID_0, C_GREEN);
+      UG_ButtonSetBackColor(&window0, BTN_ID_1, UG_WindowGetBackColor(&window0));
+      break;
+
+    case BTN_ID_1:
+      UG_DriverDisable(DRIVER_DRAW_LINE);
+      UG_DriverDisable(DRIVER_FILL_FRAME);
+      UG_ButtonSetBackColor(&window0, BTN_ID_0, UG_WindowGetBackColor(&window0));
+      UG_ButtonSetBackColor(&window0, BTN_ID_1, C_GREEN);
+      break;
+
+    case BTN_ID_2:
+      UG_WindowHide(&window0);
+      UG_WindowShow(&window0);
+      break;
+
+    case BTN_ID_3:
+      UG_WindowHide(&window0);
+      break;
+
+    default:
+      break;
+    }
+  }
+}
 
 // -----------------------------------------------------------------------------
 // Function Definitions
@@ -220,53 +300,179 @@ void setup()
   // Configure serial (debug)
   ser.begin(1500000);
 
-  // Configure TFT
-  tft.begin();
-
-  // Initialize display
-  tft.setRotation(1); // Landscape
-  // Un-burn-in the LCD somewhat
-  tft.fillScreen(ILI9341_BLACK);
-  delay(100);
-  tft.fillScreen(ILI9341_RED);
-  delay(100);
-  tft.fillScreen(ILI9341_GREEN);
-  delay(100);
-  tft.fillScreen(ILI9341_BLUE);
-  delay(100);
-  tft.fillScreen(ILI9341_WHITE);
-  delay(200);
-  tft.fillScreen(background_color);
-
-  // Test glyphs
-  //glyph_test();
-
-  // Testing master volume!
-  draw_master_volume();
-
-  // Configure I2C
-  Wire.begin(I2C_MASTER, 0, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_100);
-
-  tft.setFontAdafruit();
-  tft.setCursor(0, 0);
-  tft.setTextColor(text_color);
-  if (!ts.begin())
-  {
-    tft.println("Unable to start touchscreen.");
-  }
-  else
-  {
-    tft.println("Touchscreen started.");
-  }
-
-
   // Configure LED
   pinMode(led_pin, OUTPUT);
+
+  // Debug trigger
+  digitalWrite(led_pin, HIGH);
+
+  // Configure TFT
+  tft.begin();
+  tft.setRotation(1); // Landscape
+  tft.fillScreen(background_color);
+
+  digitalWrite(led_pin, LOW);
+  // Configure GUI
+  UG_Init(&gui, UserPixelSetFunction, tft.width(), tft.height());
+  UG_DriverRegister(DRIVER_DRAW_LINE, (void*)_HW_DrawLine);
+  UG_DriverRegister(DRIVER_FILL_FRAME, (void*)_HW_FillFrame);
+  UG_FontSelect(&FONT_8X12); // Default font
+
+  // Setup Console
+  UG_ConsoleSetBackcolor(console_bg);
+  UG_ConsoleSetForecolor(console_fg);
+  UG_ConsolePutString("MIDI Chimes Booting\n");
+  // TODO: put FW version or git hash or something?
+
+  // Initialize Touch Screen
+  UG_ConsolePutString("Starting touchscreen...");
+  ser.print("ts.begin()");
+  digitalWrite(led_pin, HIGH);
+  if (!ts.begin())
+  {
+    draw_BSOD(tft);
+    tft.println("Unable to start touchscreen.");
+    while (1) { yield(); }
+  }
+  digitalWrite(led_pin, LOW);
+  UG_ConsolePutString("done.\n");
+
+  // Configure I2C
+  Wire.begin(I2C_MASTER, 0, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
+  // TODO: check for fails
+
+  // Initialize SD Card
+  UG_ConsolePutString("Starting SD Card...");
+  ser.print("sd.begin()");
+  digitalWrite(led_pin, HIGH);
+  if (!sd.begin(sd_cs_pin))
+  {
+    draw_BSOD(tft);
+    sd.initErrorHalt(&tft);
+  }
+  digitalWrite(led_pin, LOW);
+  UG_ConsolePutString("done.\n");
+
+  // TODO: read config file
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Directory list SD card
+  //////////////////////////////////////////////////////////////////////////////
+
+  // // Display card info
+  // const uint32_t cardSize(sd.card()->cardSize());
+  // if (cardSize == 0) {
+  //   sd.errorHalt(&tft, "cardSize failed");
+  // }
+  // tft.print("Card type: ");
+  // switch (sd.card()->type()) {
+  // case SD_CARD_TYPE_SD1:
+  //   tft.println("SD1");
+  //   break;
+
+  // case SD_CARD_TYPE_SD2:
+  //   tft.println("SD2");
+  //   break;
+
+  // case SD_CARD_TYPE_SDHC:
+  //   if (cardSize < 70000000) {
+  //     tft.println("SDHC");
+  //   } else {
+  //     tft.println("SDXC");
+  //   }
+  //   break;
+
+  // default:
+  //   tft.println("Unknown");
+  // }
+
+  // // CID Dump
+  // cid_t cid;
+  // if (!sd.card()->readCID(&cid)) {
+  //   sd.errorHalt(&tft, "readCID failed");
+  // }
+  // tft.print("Manufacturer ID: 0x");
+  // tft.println(static_cast<int>(cid.mid), HEX);
+  // tft.print("OEM ID: 0x");
+  // tft.print(cid.oid[0], HEX);
+  // tft.println(cid.oid[1], HEX);
+  // // tft.print("Product: ");
+  // // for (uint8_t i = 0; i < 5; i++) {
+  // //   tft.print(cid.pnm[i]);
+  // // }
+  // // tft.println();
+  // // tft.print("Version: ");
+  // // tft.print(static_cast<int>(cid.prv_n));
+  // // tft.print(".");
+  // // tft.println(static_cast<int>(cid.prv_m));
+  // tft.print("Serial number: 0x");
+  // tft.println(cid.psn, HEX);
+  // tft.print("Manufacturing date: ");
+  // tft.print(static_cast<int>(cid.mdt_month));
+  // tft.print("/");
+  // tft.println(2000 + cid.mdt_year_low + 10 * cid.mdt_year_high);
+  // tft.println("File listing:");
+
+  // //tft.println("SD card found! File listing:");
+  // // tft.print("FreeStack: ");
+  // // tft.println(FreeStack());
+  // // tft.println();
+
+  // // List files in root directory.
+  // if (!dirFile.open("/", O_READ))
+  // {
+  //   sd.errorHalt(&tft, "open root failed");
+  // }
+  // uint16_t files_found(0);
+  // const uint16_t nMax(13); // Max files to list
+  // while (files_found < nMax && file.openNext(&dirFile, O_READ))
+  // {
+  //   // Skip directories and hidden files.
+  //   if (!file.isSubDir() && !file.isHidden())
+  //   {
+  //     // Save dirIndex of file in directory.
+  //     //dirIndex[files_found] = file.dirIndex();
+
+  //     // Print the file number and name.
+  //     files_found++;
+  //     //tft.print(files_found++);
+  //     //tft.print(' ');
+  //     tft.print(file.dirIndex());
+  //     tft.print(" ");
+  //     file.printName(&tft);
+  //     tft.println();
+  //   }
+  //   file.close();
+  // }
 
   // Configure USB MIDI
   usbMIDI.setHandleNoteOn(OnNoteOn);
   // usbMIDI.setHandleNoteOff(OnNoteOff); // Not needed
   // TODO: handle more MIDI stuff?
+
+  // Draw Main Window
+  draw_main_window();
+  UG_WindowShow(&main_window);
+
+  // GUI Tests
+  // TODO: delete & do right
+  UG_WindowCreate(&window0, obj_buff_window0, MAX_OBJECTS, window0_callback);
+  UG_WindowResize(&window0, 20, 20, 319-20, 239-20);
+  UG_WindowSetTitleText(&window0, "\xE6GUI Test Window");
+  UG_WindowSetTitleTextFont(&window0, &FONT_8X12);
+  UG_ButtonCreate(&window0, &button0, BTN_ID_0, 10, 10, 100,  60);
+  UG_ButtonSetFont(&window0, BTN_ID_0, &FONT_8X12);
+  UG_ButtonSetText(&window0, BTN_ID_0, "H/W Acc\nON");
+  UG_ButtonSetBackColor(&window0, BTN_ID_0, C_GREEN);
+  UG_ButtonCreate(&window0, &button1, BTN_ID_1, 10, 70, 100, 130);
+  UG_ButtonSetFont(&window0, BTN_ID_1, &FONT_8X12);
+  UG_ButtonSetText(&window0, BTN_ID_1, "H/W Acc\nOFF");
+  UG_ButtonCreate(&window0, &button2, BTN_ID_2, 110, 10, 200, 60);
+  UG_ButtonSetFont(&window0, BTN_ID_2, &FONT_8X12);
+  UG_ButtonSetText(&window0, BTN_ID_2, "Redraw");
+  UG_ButtonCreate(&window0, &button3, BTN_ID_3, 110, 70, 200, 130);
+  UG_ButtonSetFont(&window0, BTN_ID_3, &FONT_8X12);
+  UG_ButtonSetText(&window0, BTN_ID_3, "Close");
 }
 
 // Main program loop
@@ -275,49 +481,51 @@ void loop()
   // Handle USB MIDI messages
   usbMIDI.read();
 
-  // Handle touch events
-  if (ts.touched())
+  // Handle GUI & Touch
+  const bool touched(ts.touched());
+#ifdef CAPACITIVE_TS
+  if (touched)
   {
     // Retrieve a point
     TS_Point p = ts.getPoint();
 
-#ifdef CAPACITIVE_TS
     // Rotate the screen
     const int y(p.x);
     const int x(tft.width() - p.y);
-#else
+
+    // New GUI Test
+    UG_TouchUpdate(x, y, TOUCH_STATE_PRESSED);
+  }
+  else
+  {
+    UG_TouchUpdate(-1, -1, TOUCH_STATE_RELEASED);
+  }
+#else // Resistive touch screen
+  if (!ts.bufferEmpty())
+  {
+    // Retrieve a point
+    TS_Point p = ts.getPoint();
+
     // Scale using the calibration #'s and rotate coordinate system
     p.x = map(p.x, ts_min_y, ts_max_y, 0, tft.height());
     p.y = map(p.y, ts_min_x, ts_max_x, 0, tft.width());
     const int x(p.y);
     const int y(tft.height() - p.x);
-#endif
 
-    // DEBUG draw touch point
-    //tft.drawCircle(x, y, 5, ILI9341_PURPLE);
-
-    // DEBUG: manually check volume buttons for hit
-    // TODO: probably make a class for buttons, like Adafruit_GFX_Button
-    //       maybe just fix/extend that one?
-    // Down
-    if (hit_test(x, y, button_vol_d_x, button_vol_d_y, button_vol_w, button_vol_h))
+    // New GUI Test
+    UG_TouchUpdate(x, y, touched ? TOUCH_STATE_PRESSED : TOUCH_STATE_RELEASED);
+  }
+  else
+  {
+    if (!touched)
     {
-      if (master_volume >= 10)
-      {
-        master_volume -= 10;
-        update_master_volume();
-      }
-    }
-    // Up
-    if (hit_test(x, y, button_vol_u_x, button_vol_u_y, button_vol_w, button_vol_h))
-    {
-      if (master_volume <= 90)
-      {
-        master_volume += 10;
-        update_master_volume();
-      }
+      UG_TouchUpdate(-1, -1, TOUCH_STATE_RELEASED);
     }
   }
+#endif
+
+  // Update the GUI
+  UG_Update();
 }
 
 void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
@@ -390,222 +598,156 @@ bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out,
   return false;
 }
 
-// Draws the master volume section (assumes blank screen)
-void draw_master_volume()
+// Change the master volume by the amount specified
+void adjust_master_volume(int8_t change)
 {
-  // Down button
-  tft.fillRoundRect(button_vol_d_x, button_vol_d_y, button_vol_w, button_vol_h, button_radius, button_color);  // Button
-  tft.drawRoundRect(button_vol_d_x, button_vol_d_y, button_vol_w, button_vol_h, button_radius, button_border); // Border
+  // Adjust the volume
+  master_volume += change;
 
-  // Up button
-  tft.fillRoundRect(button_vol_u_x, button_vol_u_y, button_vol_w, button_vol_h, button_radius, button_color);  // Button
-  tft.drawRoundRect(button_vol_u_x, button_vol_u_y, button_vol_w, button_vol_h, button_radius, button_border); // Border
-
-  // Label
-  tft.setFont(LiberationSans_12);
-  tft.setTextColor(text_color);
-  // Text is 12px tall, and 107px wide (I measured it). We want to center it.
-  const int16_t text_w = 107, text_h = 12;
-  const int16_t text_x = (320 - text_w) / 2, text_y = 240 - 5 - 50 - 5 - text_h;
-  tft.drawFastHLine(0, text_y + (text_h / 2), text_x - 5, text_color);
-  tft.setCursor(text_x, text_y);
-  tft.print("Master Volume");
-  tft.drawFastHLine(text_x + text_w + 5, text_y + (text_h / 2), 320 - text_x - text_w - 5, text_color);
-
-  // Volume bar
-  update_master_volume();
-}
-
-// Updates the master volume bar (assumes draw_master_volume() was run)
-void update_master_volume()
-{
-  // Text offsets, because this font system sucks
-  const int16_t offset_d_x = 10, offset_d_y = 18;
-  const int16_t offset_u_x = 15, offset_u_y = 17;
-
-  // Button font
-  tft.setFont(AwesomeF000_24);
-
-  // Down button
-  if (master_volume > 0)
+  // Limit range to 0-100, enable/disable buttons
+  if (master_volume >= 100)
   {
-    tft.setTextColor(button_text);
+    master_volume = 100;
+
+    // Disable volume up button
+    UG_ButtonSetForeColor(&main_window, BTN_ID_2, button_text_disabled);
+    UG_ButtonSetStyle(&main_window, BTN_ID_2, BTN_STYLE_2D);
+  }
+  else if (master_volume <= 0)
+  {
+    master_volume = 0;
+
+    // Disable volume down button
+    UG_ButtonSetForeColor(&main_window, BTN_ID_1, button_text_disabled);
+    UG_ButtonSetStyle(&main_window, BTN_ID_1, BTN_STYLE_2D);
   }
   else
   {
-    tft.setTextColor(button_text_disabled);
-  }
-  tft.setCursor(
-    button_vol_d_x + (button_vol_w / 2) - offset_d_x,
-    button_vol_d_y + (button_vol_h / 2) - offset_d_y);
-  tft.print('\x27');
-
-  // Up button
-  if (master_volume < 100)
-  {
-    tft.setTextColor(button_text);
-  }
-  else
-  {
-    tft.setTextColor(button_text_disabled);
-  }
-  tft.setCursor(
-    button_vol_u_x + (button_vol_w / 2) - offset_u_x,
-    button_vol_u_y + (button_vol_h / 2) - offset_u_y);
-  tft.print('\x28');
-
-  // Buttons are 50 x 50, offset 5 from edge of screen
-  // Bar should be between them, 5 padding from buttons
-  const int16_t bar_x =  60, bar_y = 185;
-  const int16_t bar_w = 200, bar_h =  50;
-  const int16_t vol_w = master_volume * bar_w / 100;
-
-  // Draw background
-  if (master_volume < 100)
-  {
-    tft.fillRoundRect(bar_x, bar_y, bar_w, bar_h, button_radius, button_color);
+    // Enable both buttons
+    const UG_COLOR fg(UG_WindowGetForeColor(&main_window));
+    UG_ButtonSetForeColor(&main_window, BTN_ID_1, fg);
+    UG_ButtonSetStyle(&main_window, BTN_ID_1, BTN_STYLE_3D);
+    UG_ButtonSetForeColor(&main_window, BTN_ID_2, fg);
+    UG_ButtonSetStyle(&main_window, BTN_ID_2, BTN_STYLE_3D);
   }
 
-  // Draw volume level
-  if (master_volume > 0)
-  {
-    tft.fillRoundRect(bar_x, bar_y, vol_w, bar_h, button_radius, volume_color);
-    // TODO: square up right edges?
-  }
-
-  // Draw border
-  tft.drawRoundRect(bar_x, bar_y, bar_w, bar_h, button_radius, button_border);
-
-  // Current volume
-  int16_t num_chars(3);
-  if (master_volume < 10)
-  {
-    num_chars = 2;
-  }
-  else if (master_volume >= 100)
-  {
-    num_chars = 4;
-  }
-  tft.setFont(LiberationMono_32);
-  tft.setTextColor(button_text);
-  // Text is 32px tall, and characters are 26px wide (I measured it).
-  // There ios a vertical offset of 2 pixels needed.
-  const int16_t char_w = 26, char_h = 32;
-  const int16_t text_w = num_chars * char_w;
-  const int16_t text_x = (320 - text_w) / 2, text_y = 240 - 5 - 25 - (char_h / 2);
-  // int x = 10, y = 10;
-  // tft.drawFastHLine(0, y, 320, ILI9341_GREEN);
-  // tft.drawFastHLine(0, y + char_h, 320, ILI9341_GREEN);
-  // tft.drawFastVLine(x, 0, 240, ILI9341_GREEN);
-  // tft.drawFastVLine(x + char_w, 0, 240, ILI9341_GREEN);
-  // tft.drawFastVLine(x + 2 * char_w, 0, 240, ILI9341_GREEN);
-  // tft.drawFastVLine(x + 3 * char_w, 0, 240, ILI9341_GREEN);
-  // tft.drawFastVLine(x + 4 * char_w, 0, 240, ILI9341_GREEN);
-  // tft.setCursor(x, y + 2);
-  // tft.print("888%");
-
-  // tft.drawFastHLine(0, text_y + (text_h / 2), text_x - 5, text_color);
-  tft.setCursor(text_x, text_y + 2); // Offset because this font setup blows
-  tft.print(master_volume);
-  tft.print("%");
+  // Update the text
+  sprintf(volume_text_buffer, "Volume: %d%%", master_volume);
+  UG_TextboxSetText(&main_window, TXB_ID_0, volume_text_buffer);
 }
 
-void glyph_test()
+void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c)
 {
-  // Test printing crap
-  tft.setTextColor(ILI9341_YELLOW);
-  // uint8_t padding(4);
-  // uint8_t font_height(12);
-  // tft.setCursor(padding, padding + 0 * (font_height + padding));
-  // tft.setFont(LiberationSans_12);
-  // tft.print("LiberationSans");
-  // tft.setCursor(padding, padding + 1 * (font_height + padding));
-  // tft.setFont(LiberationSans_12_Bold);
-  // tft.print("LiberationSans Bold");
-  // tft.setCursor(padding, padding + 2 * (font_height + padding));
-  // tft.setFont(LiberationSans_12_Italic);
-  // tft.print("LiberationSans Italic");
-  // tft.setCursor(padding, padding + 3 * (font_height + padding));
-  // tft.setFont(LiberationSans_12_Bold_Italic);
-  // tft.print("LiberationSans Bold Italic");
-
-  // tft.setFont(AwesomeF000_24);
-  // tft.setCursor(10, 160);
-  // tft.print('\x27'); // Volume Down Icon
-  // tft.setCursor(160, 160);
-  // tft.print((char)17); // Power Icon
-  // tft.setCursor(220, 160);
-  // tft.print((char)40); // Volume Up Icon
-
-  // Learning character sizes
-  tft.setFont(AwesomeF000_24);
-  int16_t x, y = 100;
-
-  // Line at y=100
-  tft.drawFastHLine(0, y, 320, ILI9341_WHITE);
-
-  // Test glyph alignment
-  char glyph('\x7C');
-  uint16_t w = 35, h = 26; // Claimed size
-  int16_t offset_x = 0, offset_y = 3;
-
-  // In box, offset
-  x = 50;
-  tft.drawFastVLine(x, 0, 240, ILI9341_WHITE);
-  tft.drawRect(x, y, w, h, ILI9341_RED);
-  tft.setCursor(x - offset_x, y - offset_y);
-  tft.print(glyph);
-
-  // In box, centered
-  x = 100;
-  offset_x += w / 2; // 0
-  offset_y += h / 2; // 4
-  tft.drawFastVLine(x, 0, 240, ILI9341_WHITE);
-  tft.drawRect(x - (w / 2), y - (h / 2), w, h, ILI9341_RED);
-  tft.setCursor(x - offset_x, y - offset_y);
-  tft.print(glyph);
-
-  // Centered
-  x = 150;
-  tft.drawFastVLine(x, 0, 240, ILI9341_WHITE);
-  tft.setCursor(x - offset_x, y - offset_y);
-  tft.print(glyph);
-
-  // Display final offset
-  tft.setFontAdafruit();
-  tft.setCursor(0, 0);
-  tft.print("Offset: ");
-  tft.print(offset_x);
-  tft.print(",");
-  tft.println(offset_y);
+  tft.drawPixel(x, y, c);
 }
 
-bool hit_test(const int16_t& x, const int16_t& y, const int16_t& _x, const int16_t& _y, const int16_t& _w, const int16_t& _h)
+UG_RESULT _HW_DrawLine(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c)
 {
-  bool hit(true);
-  if ((x < _x) || (x > (_x + _w)))
-    hit = false;
-  if ((y < _y) || (y > (_y + _h)))
-    hit = false;
+  // Vertical line
+  if (x1 == x2)
+  {
+    tft.drawFastVLine(x1, y1, y2 - y1 + 1, c);
+    return UG_RESULT_OK;
+  }
 
-  // // DEBUG
-  // tft.setTextColor(ILI9341_BLACK);
-  // tft.setFontAdafruit();
-  // tft.print("Hit testing (");
-  // tft.print(x);
-  // tft.print(",");
-  // tft.print(y);
-  // tft.println(")");
-  // tft.print("against button (");
-  // tft.print(_x);
-  // tft.print(",");
-  // tft.print(_y);
-  // tft.print(") to (");
-  // tft.print(_x + _w);
-  // tft.print(",");
-  // tft.print(_y + _h);
-  // tft.println("):");
-  // tft.println(hit);
+  // Horizontal line
+  if (y1 == y2)
+  {
+    tft.drawFastHLine(x1, y1, x2 - x1 + 1, c);
+    return UG_RESULT_OK;
+  }
 
-  return hit;
+  // Other lines can't be accelerated
+  return UG_RESULT_FAIL;
+}
+
+UG_RESULT _HW_FillFrame(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c)
+{
+  tft.fillRect(x1, y1, x2 - x1 + 1, y2 - y1 + 1, c);
+  return UG_RESULT_OK;
+}
+
+void draw_main_window()
+{
+  // Window
+  UG_WindowCreate(&main_window, main_window_buffer, sizeof(main_window_buffer) / sizeof(*main_window_buffer), main_callback);
+  UG_WindowSetTitleTextAlignment(&main_window, ALIGN_CENTER);
+  UG_WindowSetTitleText(&main_window, "MIDI Chimes");
+
+  // Get usable size
+  const uint16_t width(UG_WindowGetInnerWidth(&main_window));
+  const uint16_t height(UG_WindowGetInnerHeight(&main_window));
+  const uint16_t padding(5);
+  const uint16_t button_size(50);
+
+  // Settings button
+  UG_ButtonCreate(&main_window, &main_window_button_settings, BTN_ID_0,
+    padding,                // top-left x
+    padding,                // top-left y
+    padding + button_size,  // bottom-right x
+    padding + button_size); // bottom-right y
+  UG_ButtonSetFont(&main_window, BTN_ID_0, &font_FontAwesome_mod_50X40);
+  UG_ButtonSetText(&main_window, BTN_ID_0, fa_icon_settings);
+
+  // Volume Down button
+  UG_ButtonCreate(&main_window, &main_window_button_vol_dn, BTN_ID_1,
+    padding,
+    height - padding - button_size,
+    padding + button_size,
+    height - padding);
+  UG_ButtonSetFont(&main_window, BTN_ID_1, &font_FontAwesome_mod_50X40);
+  UG_ButtonSetText(&main_window, BTN_ID_1, fa_icon_vol_dn);
+
+  // Volume Up button
+  UG_ButtonCreate(&main_window, &main_window_button_vol_up, BTN_ID_2,
+    width - padding - button_size,
+    height - padding - button_size,
+    width - padding,
+    height - padding);
+  UG_ButtonSetFont(&main_window, BTN_ID_2, &font_FontAwesome_mod_50X40);
+  UG_ButtonSetText(&main_window, BTN_ID_2, fa_icon_vol_up);
+
+  // Volume text box
+  UG_TextboxCreate(&main_window, &main_window_text_volume, TXB_ID_0,
+    padding + button_size + padding,
+    height - padding - button_size,
+    width - padding - button_size - padding,
+    height - padding);
+  UG_TextboxSetFont(&main_window, TXB_ID_0, &FONT_8X12);
+  UG_TextboxSetAlignment(&main_window, TXB_ID_0, ALIGN_CENTER);
+  UG_TextboxSetBackColor(&main_window, TXB_ID_0, C_RED);
+  adjust_master_volume(0);
+}
+
+void main_callback(UG_MESSAGE* msg)
+{
+  // TODO: Handle press and hold for volume keys?
+  // I would need to do a rate-limit of some kind
+  if ((msg->type == MSG_TYPE_OBJECT) &&
+      (msg->id == OBJ_TYPE_BUTTON) &&
+      (msg->event == BTN_EVENT_CLICKED))
+  {
+    switch (msg->sub_id)
+    {
+    // Settings
+    case BTN_ID_0:
+      UG_WindowShow(&window0);
+      break;
+
+    // Volume Down
+    case BTN_ID_1:
+      adjust_master_volume(-10);
+      break;
+
+    // Volume Up
+    case BTN_ID_2:
+      adjust_master_volume(10);
+      break;
+
+    default:
+      break;
+    }
+  }
+  // TODO: look into owner-drawing the volume text box using the pre-draw events or post-draw events
+  // This might let me do the progress bar again
 }
