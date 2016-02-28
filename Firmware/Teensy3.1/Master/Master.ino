@@ -200,8 +200,8 @@ UG_RESULT _HW_FillFrame(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c);
 void draw_main_window();
 void main_callback(UG_MESSAGE* msg);
 // Settings Window
-// void draw_settings_window();
-// void settings_callback(UG_MESSAGE* msg);
+void draw_settings_window();
+void settings_callback(UG_MESSAGE* msg);
 
 
 // -----------------------------------------------------------------------------
@@ -246,49 +246,13 @@ UG_BUTTON main_window_button_vol_up;
 UG_PROGRESSBAR main_window_prb_volume;
 UG_OBJECT main_window_buffer[MAX_OBJECTS];
 char volume_text_buffer[16] = { 0 };
-// TODO: this
-UG_WINDOW window0;
-UG_BUTTON button0;
-UG_BUTTON button1;
-UG_BUTTON button2;
-UG_BUTTON button3;
-UG_OBJECT obj_buff_window0[MAX_OBJECTS];
-void window0_callback(UG_MESSAGE* msg)
-{
-  if ((msg->type == MSG_TYPE_OBJECT) &&
-      (msg->id == OBJ_TYPE_BUTTON) &&
-      (msg->event == BTN_EVENT_CLICKED))
-  {
-    switch (msg->sub_id)
-    {
-    case BTN_ID_0:
-      UG_DriverEnable(DRIVER_DRAW_LINE);
-      UG_DriverEnable(DRIVER_FILL_FRAME);
-      UG_ButtonSetBackColor(&window0, BTN_ID_0, C_GREEN);
-      UG_ButtonSetBackColor(&window0, BTN_ID_1, UG_WindowGetBackColor(&window0));
-      break;
-
-    case BTN_ID_1:
-      UG_DriverDisable(DRIVER_DRAW_LINE);
-      UG_DriverDisable(DRIVER_FILL_FRAME);
-      UG_ButtonSetBackColor(&window0, BTN_ID_0, UG_WindowGetBackColor(&window0));
-      UG_ButtonSetBackColor(&window0, BTN_ID_1, C_GREEN);
-      break;
-
-    case BTN_ID_2:
-      UG_WindowHide(&window0);
-      UG_WindowShow(&window0);
-      break;
-
-    case BTN_ID_3:
-      UG_WindowHide(&window0);
-      break;
-
-    default:
-      break;
-    }
-  }
-}
+// Settings Window
+UG_WINDOW settings_window;
+UG_BUTTON settings_hw_accel_on_button;
+UG_BUTTON settings_hw_accel_off_button;
+UG_BUTTON settings_redraw_button;
+UG_BUTTON settings_close_button;
+UG_OBJECT obj_buff_settings_window[MAX_OBJECTS];
 
 // -----------------------------------------------------------------------------
 // Function Definitions
@@ -454,25 +418,8 @@ void setup()
   draw_main_window();
   UG_WindowShow(&main_window);
 
-  // GUI Tests
-  // TODO: delete & do right
-  UG_WindowCreate(&window0, obj_buff_window0, MAX_OBJECTS, window0_callback);
-  UG_WindowResize(&window0, 20, 20, 319-20, 239-20);
-  UG_WindowSetTitleText(&window0, "\xE6GUI Test Window");
-  UG_WindowSetTitleTextFont(&window0, &FONT_8X12);
-  UG_ButtonCreate(&window0, &button0, BTN_ID_0, 10, 10, 100,  60);
-  UG_ButtonSetFont(&window0, BTN_ID_0, &FONT_8X12);
-  UG_ButtonSetText(&window0, BTN_ID_0, "H/W Acc\nON");
-  UG_ButtonSetBackColor(&window0, BTN_ID_0, C_GREEN);
-  UG_ButtonCreate(&window0, &button1, BTN_ID_1, 10, 70, 100, 130);
-  UG_ButtonSetFont(&window0, BTN_ID_1, &FONT_8X12);
-  UG_ButtonSetText(&window0, BTN_ID_1, "H/W Acc\nOFF");
-  UG_ButtonCreate(&window0, &button2, BTN_ID_2, 110, 10, 200, 60);
-  UG_ButtonSetFont(&window0, BTN_ID_2, &FONT_8X12);
-  UG_ButtonSetText(&window0, BTN_ID_2, "Redraw");
-  UG_ButtonCreate(&window0, &button3, BTN_ID_3, 110, 70, 200, 130);
-  UG_ButtonSetFont(&window0, BTN_ID_3, &FONT_8X12);
-  UG_ButtonSetText(&window0, BTN_ID_3, "Close");
+  // Settings window
+  draw_settings_window();
 }
 
 // Main program loop
@@ -742,7 +689,7 @@ void main_callback(UG_MESSAGE* msg)
     {
     // Settings
     case BTN_ID_0:
-      UG_WindowShow(&window0);
+      UG_WindowShow(&settings_window);
       break;
 
     // Volume Down
@@ -761,4 +708,62 @@ void main_callback(UG_MESSAGE* msg)
   }
   // TODO: look into owner-drawing the volume text box using the pre-draw events or post-draw events
   // This might let me do the progress bar again
+}
+
+void draw_settings_window()
+{
+  UG_WindowCreate(&settings_window, obj_buff_settings_window, MAX_OBJECTS, settings_callback);
+  UG_WindowResize(&settings_window, 20, 20, 319-20, 239-20);
+  UG_WindowSetTitleText(&settings_window, "\xE6GUI Test Window");
+  UG_WindowSetTitleTextFont(&settings_window, &FONT_8X12);
+  UG_ButtonCreate(&settings_window, &settings_hw_accel_on_button, BTN_ID_0, 10, 10, 100,  60);
+  UG_ButtonSetFont(&settings_window, BTN_ID_0, &FONT_8X12);
+  UG_ButtonSetText(&settings_window, BTN_ID_0, "H/W Acc\nON");
+  UG_ButtonSetBackColor(&settings_window, BTN_ID_0, C_GREEN);
+  UG_ButtonCreate(&settings_window, &settings_hw_accel_off_button, BTN_ID_1, 10, 70, 100, 130);
+  UG_ButtonSetFont(&settings_window, BTN_ID_1, &FONT_8X12);
+  UG_ButtonSetText(&settings_window, BTN_ID_1, "H/W Acc\nOFF");
+  UG_ButtonCreate(&settings_window, &settings_redraw_button, BTN_ID_2, 110, 10, 200, 60);
+  UG_ButtonSetFont(&settings_window, BTN_ID_2, &FONT_8X12);
+  UG_ButtonSetText(&settings_window, BTN_ID_2, "Redraw");
+  UG_ButtonCreate(&settings_window, &settings_close_button, BTN_ID_3, 110, 70, 200, 130);
+  UG_ButtonSetFont(&settings_window, BTN_ID_3, &FONT_8X12);
+  UG_ButtonSetText(&settings_window, BTN_ID_3, "Close");
+}
+
+void settings_callback(UG_MESSAGE* msg)
+{
+  if ((msg->type == MSG_TYPE_OBJECT) &&
+      (msg->id == OBJ_TYPE_BUTTON) &&
+      (msg->event == BTN_EVENT_CLICKED))
+  {
+    switch (msg->sub_id)
+    {
+    case BTN_ID_0:
+      UG_DriverEnable(DRIVER_DRAW_LINE);
+      UG_DriverEnable(DRIVER_FILL_FRAME);
+      UG_ButtonSetBackColor(&settings_window, BTN_ID_0, C_GREEN);
+      UG_ButtonSetBackColor(&settings_window, BTN_ID_1, UG_WindowGetBackColor(&settings_window));
+      break;
+
+    case BTN_ID_1:
+      UG_DriverDisable(DRIVER_DRAW_LINE);
+      UG_DriverDisable(DRIVER_FILL_FRAME);
+      UG_ButtonSetBackColor(&settings_window, BTN_ID_0, UG_WindowGetBackColor(&settings_window));
+      UG_ButtonSetBackColor(&settings_window, BTN_ID_1, C_GREEN);
+      break;
+
+    case BTN_ID_2:
+      UG_WindowHide(&settings_window);
+      UG_WindowShow(&settings_window);
+      break;
+
+    case BTN_ID_3:
+      UG_WindowHide(&settings_window);
+      break;
+
+    default:
+      break;
+    }
+  }
 }
