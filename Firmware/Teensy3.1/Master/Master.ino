@@ -58,6 +58,7 @@
 #include <ILI9341_t3.h>
 #include <SdFat.h>
 
+// GUI
 extern "C"
 {
   #include "ugui.h"
@@ -71,7 +72,6 @@ extern "C"
 #endif
 
 // Fonts
-#include <font_DroidSans.h>
 // #include <font_LiberationMono.h>
 // #include <font_LiberationSans.h>
 // #include <font_LiberationSansBold.h>
@@ -79,6 +79,9 @@ extern "C"
 // #include <font_LiberationSansBoldItalic.h>
 // #include <font_AwesomeF000.h>
 #include "FontAwesome_mod_50X40.h"
+
+// Blue Screen of Death :P
+#include "bsod_win10.h"
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -146,10 +149,6 @@ const uint16_t blink_time(20000); // microseconds
 // Graphics settings
 const uint16_t console_bg(0x0000); // Windows 98+ #000000 --> RGB565
 const uint16_t console_fg(0xC618); // Windows XP+ #C0C0C0 --> RGB565 (98 used #A8A8A8)
-const uint16_t bsod_bg_windows_xp(0x0010); // #000082 --> RGB565
-const uint16_t bsod_fg_windows_xp(0xFFFF); // #FFFFFF --> RGB565
-const uint16_t bsod_bg_windows_10(0x2336); // #2067B2 --> RGB565
-const uint16_t bsod_fg_windows_10(0xFFFF); // #FFFFFF --> RGB565
 const uint16_t background_color(ILI9341_YELLOW);
 const uint16_t button_text_disabled(C_GRAY);
 
@@ -203,8 +202,6 @@ void main_callback(UG_MESSAGE* msg);
 // Settings Window
 // void draw_settings_window();
 // void settings_callback(UG_MESSAGE* msg);
-// BSOD
-void draw_BSOD();
 
 
 // -----------------------------------------------------------------------------
@@ -333,7 +330,7 @@ void setup()
   digitalWrite(led_pin, HIGH);
   if (!ts.begin())
   {
-    draw_BSOD();
+    draw_BSOD(tft);
     tft.println("Unable to start touchscreen.");
     while (1) { yield(); }
   }
@@ -350,7 +347,7 @@ void setup()
   digitalWrite(led_pin, HIGH);
   if (!sd.begin(sd_cs_pin))
   {
-    draw_BSOD();
+    draw_BSOD(tft);
     sd.initErrorHalt(&tft);
   }
   digitalWrite(led_pin, LOW);
@@ -753,28 +750,4 @@ void main_callback(UG_MESSAGE* msg)
   }
   // TODO: look into owner-drawing the volume text box using the pre-draw events or post-draw events
   // This might let me do the progress bar again
-}
-
-void draw_BSOD()
-{
-  // Windows 10 BSOD, for the LOLZ
-  tft.fillScreen(bsod_bg_windows_10);
-  tft.setTextColor(bsod_fg_windows_10);
-  // UG_SetBackColor(bsod_bg_windows_10);
-  // UG_SetForecolor(bsod_fg_windows_10);
-  // UG_FontSelect();
-  tft.setFont(DroidSans_60);
-  tft.setCursor(20, 15);
-  tft.print(":(");
-  tft.setFont(DroidSans_14);
-  tft.setCursor(80, 24);
-  tft.println("Your PC ran into a problem");
-  tft.setCursor(80, 45);
-  tft.println("that it couldn't handle,");
-  tft.setCursor(80, 66);
-  tft.println("and now it needs to restart.");
-  tft.setCursor(0, 100);
-  tft.setFontAdafruit();
-
-  // TODO: dump some version/debug info at the top?
 }
