@@ -5325,11 +5325,10 @@ void _UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const 
            {
               for( i=0;i<actual_char_width;i++ )
               {
-                 UG_U8 bgmask = (bc != fc) ? 0xFFFFFF : 0x000000;
                  b = font->p[index++];
-                 color = ((((fc & 0x0000FF) * b + (bc & 0x0000FF & bgmask) * (256 - b)) >> 8) & 0x0000FF) |  // Blue component
-                         ((((fc & 0x00FF00) * b + (bc & 0x00FF00 & bgmask) * (256 - b)) >> 8) & 0x00FF00) |  // Green component
-                         ((((fc & 0xFF0000) * b + (bc & 0xFF0000 & bgmask) * (256 - b)) >> 8) & 0xFF0000);   // Red component
+                 color = ((((fc & 0xFF) * b + (bc & 0xFF) * (256 - b)) >> 8) & 0xFF) | // Blue component
+                         ((((fc & 0xFF00) * b + (bc & 0xFF00) * (256 - b)) >> 8)  & 0xFF00) | // Green component
+                         ((((fc & 0xFF0000) * b + (bc & 0xFF0000) * (256 - b)) >> 8) & 0xFF0000); // Red component
                  push_pixel(color);
               }
               index += font->char_width - actual_char_width;
@@ -5375,11 +5374,10 @@ void _UG_PutChar( char chr, UG_S16 x, UG_S16 y, UG_COLOR fc, UG_COLOR bc, const 
             xo = x;
             for( i=0;i<actual_char_width;i++ )
             {
-               UG_U8 bgmask = (bc != fc) ? 0xFFFFFF : 0x000000;
                b = font->p[index++];
-               color = ((((fc & 0x0000FF) * b + (bc & 0x0000FF & bgmask) * (256 - b)) >> 8) & 0x0000FF) |  // Blue component
-                       ((((fc & 0x00FF00) * b + (bc & 0x00FF00 & bgmask) * (256 - b)) >> 8) & 0x00FF00) |  // Green component
-                       ((((fc & 0xFF0000) * b + (bc & 0xFF0000 & bgmask) * (256 - b)) >> 8) & 0xFF0000);   // Red component
+               color = ((((fc & 0xFF) * b + (bc & 0xFF) * (256 - b)) >> 8) & 0xFF) | // Blue component
+                         ((((fc & 0xFF00) * b + (bc & 0xFF00) * (256 - b)) >> 8)  & 0xFF00) | // Green component
+                         ((((fc & 0xFF0000) * b + (bc & 0xFF0000) * (256 - b)) >> 8) & 0xFF0000); // Red component
                gui->pset(xo,yo,color);
                xo++;
             }
