@@ -218,6 +218,7 @@ void settings_callback(UG_MESSAGE* msg);
 void draw_fb_window();
 void fb_window_callback(UG_MESSAGE* msg);
 void fb_draw_highlight(int16_t line);
+void update_file_list();
 
 
 // -----------------------------------------------------------------------------
@@ -265,6 +266,8 @@ char volume_text_buffer[5] = { 0 };
 
 // File Browse window
 #define FB_LIST_SIZE 7
+#define MAX_NAME 32
+#define MAX_PATH 256
 UG_WINDOW fb_window;
 UG_BUTTON fb_up_button;
 UG_BUTTON fb_down_button;
@@ -273,8 +276,9 @@ UG_BUTTON fb_select_button;
 UG_TEXTBOX fb_current_path;
 UG_TEXTBOX fb_file_list[FB_LIST_SIZE];
 UG_OBJECT fb_window_buffer[FB_LIST_SIZE+6];
-char selected_file_buffer[32] = { 0 };
-char file_list_buffer[FB_LIST_SIZE][32] = { 0 };
+char selected_file_buffer[MAX_NAME] = { 0 };
+char selected_path_buffer[MAX_PATH] = "/";
+char file_list_buffer[FB_LIST_SIZE][MAX_NAME] = { 0 };
 
 // Settings Window
 UG_WINDOW settings_window;
@@ -348,96 +352,6 @@ void setup()
   UG_ConsolePutString("done.\n");
 
   // TODO: read config file
-
-  //////////////////////////////////////////////////////////////////////////////
-  // Directory list SD card
-  //////////////////////////////////////////////////////////////////////////////
-
-  // // Display card info
-  // const uint32_t cardSize(sd.card()->cardSize());
-  // if (cardSize == 0) {
-  //   sd.errorHalt(&tft, "cardSize failed");
-  // }
-  // tft.print("Card type: ");
-  // switch (sd.card()->type()) {
-  // case SD_CARD_TYPE_SD1:
-  //   tft.println("SD1");
-  //   break;
-
-  // case SD_CARD_TYPE_SD2:
-  //   tft.println("SD2");
-  //   break;
-
-  // case SD_CARD_TYPE_SDHC:
-  //   if (cardSize < 70000000) {
-  //     tft.println("SDHC");
-  //   } else {
-  //     tft.println("SDXC");
-  //   }
-  //   break;
-
-  // default:
-  //   tft.println("Unknown");
-  // }
-
-  // // CID Dump
-  // cid_t cid;
-  // if (!sd.card()->readCID(&cid)) {
-  //   sd.errorHalt(&tft, "readCID failed");
-  // }
-  // tft.print("Manufacturer ID: 0x");
-  // tft.println(static_cast<int>(cid.mid), HEX);
-  // tft.print("OEM ID: 0x");
-  // tft.print(cid.oid[0], HEX);
-  // tft.println(cid.oid[1], HEX);
-  // // tft.print("Product: ");
-  // // for (uint8_t i = 0; i < 5; i++) {
-  // //   tft.print(cid.pnm[i]);
-  // // }
-  // // tft.println();
-  // // tft.print("Version: ");
-  // // tft.print(static_cast<int>(cid.prv_n));
-  // // tft.print(".");
-  // // tft.println(static_cast<int>(cid.prv_m));
-  // tft.print("Serial number: 0x");
-  // tft.println(cid.psn, HEX);
-  // tft.print("Manufacturing date: ");
-  // tft.print(static_cast<int>(cid.mdt_month));
-  // tft.print("/");
-  // tft.println(2000 + cid.mdt_year_low + 10 * cid.mdt_year_high);
-  // tft.println("File listing:");
-
-  // //tft.println("SD card found! File listing:");
-  // // tft.print("FreeStack: ");
-  // // tft.println(FreeStack());
-  // // tft.println();
-
-  // // List files in root directory.
-  // if (!dirFile.open("/", O_READ))
-  // {
-  //   sd.errorHalt(&tft, "open root failed");
-  // }
-  // uint16_t files_found(0);
-  // const uint16_t nMax(13); // Max files to list
-  // while (files_found < nMax && file.openNext(&dirFile, O_READ))
-  // {
-  //   // Skip directories and hidden files.
-  //   if (!file.isSubDir() && !file.isHidden())
-  //   {
-  //     // Save dirIndex of file in directory.
-  //     //dirIndex[files_found] = file.dirIndex();
-
-  //     // Print the file number and name.
-  //     files_found++;
-  //     //tft.print(files_found++);
-  //     //tft.print(' ');
-  //     tft.print(file.dirIndex());
-  //     tft.print(" ");
-  //     file.printName(&tft);
-  //     tft.println();
-  //   }
-  //   file.close();
-  // }
 
   // Configure USB MIDI
   usbMIDI.setHandleNoteOn(OnNoteOn);
@@ -873,6 +787,9 @@ void draw_fb_window()
   UG_ButtonSetFont(&fb_window, BTN_ID_3, &FONT_24X40);
   UG_ButtonSetText(&fb_window, BTN_ID_3, ">");
 
+  // Get the file list from the SD card
+  update_file_list();
+
   const uint16_t line_height = 16;  // Height of a single line in the file list. Depends on font
   // File list (main area)
   for (int i = 0; i < FB_LIST_SIZE; i++)
@@ -887,8 +804,9 @@ void draw_fb_window()
     UG_TextboxSetAlignment(&fb_window, txb_id, ALIGN_TOP_LEFT);
     UG_TextboxSetBackColor(&fb_window, txb_id, C_WHITE);
     UG_TextboxSetForeColor(&fb_window, txb_id, C_BLACK);
-    sprintf(file_list_buffer[i], "file%d.mid", txb_id);
-    UG_TextboxSetText(&fb_window, txb_id, file_list_buffer[i]);
+
+    // Debug output
+    // sprintf(file_list_buffer[i], "file%d.mid", txb_id);
   }
 
   // Current path text box (top center)
@@ -946,14 +864,61 @@ void fb_draw_highlight(int16_t selected_line)
   fb_selected_line = selected_line;
 
   // Limit the selection max and min.
-  // TODO: Scroll through directory entries
-  if (fb_selected_line <= 0) { fb_selected_line = 0; }
-  if (fb_selected_line >= FB_LIST_SIZE-1) { fb_selected_line = FB_LIST_SIZE-1; }
+  if (fb_selected_line <= 0)
+  { 
+    // TODO: Scroll through directory entries
+    update_file_list();
+    fb_selected_line = 0;
+  }
+  if (fb_selected_line >= FB_LIST_SIZE-1)
+  {
+    // TODO: Scroll through directory entries
+    update_file_list();
+    fb_selected_line = FB_LIST_SIZE-1;
+  }
 
   // Redraw highlight line in new location
   UG_TextboxSetBackColor(&fb_window, fb_selected_line, selected_color);
 
+  // Update file list text
+  for(int i = 0; i < FB_LIST_SIZE; i++)
+  {
+    UG_TextboxSetText(&fb_window, i, file_list_buffer[i]);
+  }
+
   // Debug output
   sprintf(selected_file_buffer, "sel: %d", fb_selected_line); 
   UG_TextboxSetText(&fb_window, (FB_LIST_SIZE+1), selected_file_buffer);
+}
+
+void update_file_list()
+{
+  // List files in directory.
+  if (!dirFile.open("/", O_READ))
+  {
+    draw_BSOD(tft);
+    sd.errorHalt(&tft, "open root failed");
+  }
+
+  uint16_t files_found(0);
+  const uint16_t nMax(FB_LIST_SIZE); // Max files to list
+  while (files_found < nMax && file.openNext(&dirFile, O_READ))
+  {
+    // Skip directories and hidden files.
+    if (file.isHidden())
+    {
+      // skip
+    }
+    else if(file.isSubDir())
+    {
+      // TODO: Show entry,, but with an icon or something
+    }
+    else
+    {
+      file.getName(file_list_buffer[files_found], MAX_NAME);
+    }
+
+    files_found++;
+    file.close();
+  }
 }
