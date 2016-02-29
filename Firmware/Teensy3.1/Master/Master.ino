@@ -217,6 +217,7 @@ void settings_callback(UG_MESSAGE* msg);
 // File Browse window
 void draw_fb_window();
 void fb_window_callback(UG_MESSAGE* msg);
+void fb_draw_highlight(int16_t line);
 
 
 // -----------------------------------------------------------------------------
@@ -227,6 +228,7 @@ void fb_window_callback(UG_MESSAGE* msg);
 uint8_t our_channel(0); // Current channel (1-16, 0 means play all)
 int8_t master_volume(100); // Master volume (0-100, 0 means mute, steps of 10)
 bool override_velocity(false); // Override velocity to master volume (true), or scale it by master volume (false)
+int16_t fb_selected_line(0); // Which line in the file browse list is currently highlighted
 
 // Timers
 elapsedMicros message_blink_timer;
@@ -262,14 +264,17 @@ UG_OBJECT main_window_buffer[5];
 char volume_text_buffer[5] = { 0 };
 
 // File Browse window
+#define FB_LIST_SIZE 7
 UG_WINDOW fb_window;
 UG_BUTTON fb_up_button;
 UG_BUTTON fb_down_button;
 UG_BUTTON fb_cancel_button;
 UG_BUTTON fb_select_button;
 UG_TEXTBOX fb_current_path;
-UG_TEXTBOX fb_file_list;
-UG_OBJECT fb_window_buffer[6];
+UG_TEXTBOX fb_file_list[FB_LIST_SIZE];
+UG_OBJECT fb_window_buffer[FB_LIST_SIZE+6];
+char selected_file_buffer[32] = { 0 };
+char file_list_buffer[FB_LIST_SIZE][32] = { 0 };
 
 // Settings Window
 UG_WINDOW settings_window;
@@ -868,27 +873,38 @@ void draw_fb_window()
   UG_ButtonSetFont(&fb_window, BTN_ID_3, &FONT_24X40);
   UG_ButtonSetText(&fb_window, BTN_ID_3, ">");
 
+  const uint16_t line_height = 16;  // Height of a single line in the file list. Depends on font
+  // File list (main area)
+  for (int i = 0; i < FB_LIST_SIZE; i++)
+  {
+    uint8_t txb_id = i;
+    UG_TextboxCreate(&fb_window, &fb_file_list[i], txb_id,
+      padding,
+      padding + button_size + padding + (i*line_height),
+      width - padding - button_size - padding,
+      padding + button_size + padding + ((i+1)*line_height));
+    UG_TextboxSetFont(&fb_window, txb_id, &FONT_10X16);
+    UG_TextboxSetAlignment(&fb_window, txb_id, ALIGN_TOP_LEFT);
+    UG_TextboxSetBackColor(&fb_window, txb_id, C_WHITE);
+    UG_TextboxSetForeColor(&fb_window, txb_id, C_BLACK);
+    sprintf(file_list_buffer[i], "file%d.mid", txb_id);
+    UG_TextboxSetText(&fb_window, txb_id, file_list_buffer[i]);
+  }
+
   // Current path text box (top center)
-  UG_TextboxCreate(&fb_window, &fb_current_path, TXB_ID_0,
+  UG_TextboxCreate(&fb_window, &fb_current_path, (FB_LIST_SIZE+1),
     padding + button_size + padding,
     padding,
     width - padding - button_size - padding,
     padding + button_size);
-  UG_TextboxSetFont(&fb_window, TXB_ID_0, &FONT_8X12);
-  UG_TextboxSetAlignment(&fb_window, TXB_ID_0, ALIGN_CENTER);
-  UG_TextboxSetBackColor(&fb_window, TXB_ID_0, C_WHITE);
-  UG_TextboxSetForeColor(&fb_window, TXB_ID_0, C_BLACK);
+  UG_TextboxSetFont(&fb_window, (FB_LIST_SIZE+1), &FONT_10X16);
+  UG_TextboxSetAlignment(&fb_window, (FB_LIST_SIZE+1), ALIGN_CENTER);
+  UG_TextboxSetBackColor(&fb_window, (FB_LIST_SIZE+1), C_WHITE);
+  UG_TextboxSetForeColor(&fb_window, (FB_LIST_SIZE+1), C_BLACK);
+  UG_TextboxSetText(&fb_window, (FB_LIST_SIZE+1), "active_file.mid");
 
-  // File list text box (main area)
-  UG_TextboxCreate(&fb_window, &fb_file_list, TXB_ID_1,
-    padding,
-    padding + button_size + padding,
-    width - padding - button_size - padding,
-    height - padding);
-  UG_TextboxSetFont(&fb_window, TXB_ID_1, &FONT_8X12);
-  UG_TextboxSetAlignment(&fb_window, TXB_ID_1, ALIGN_CENTER);
-  UG_TextboxSetBackColor(&fb_window, TXB_ID_1, C_WHITE);
-  UG_TextboxSetForeColor(&fb_window, TXB_ID_1, C_BLACK);
+  // Highlight the first line
+  fb_draw_highlight(0);
 }
 
 void fb_window_callback(UG_MESSAGE* msg)
@@ -899,12 +915,45 @@ void fb_window_callback(UG_MESSAGE* msg)
   {
     switch (msg->sub_id)
     {
+    case BTN_ID_0:  // up button
+      fb_draw_highlight(fb_selected_line - 1);
+      break;
+      
+    case BTN_ID_1:  // down button
+      fb_draw_highlight(fb_selected_line + 1);
+      break;
+      
     case BTN_ID_2:  // Close window
       UG_WindowHide(&fb_window);
+      break;
+
+    case BTN_ID_3:  // Select file/folder
+      UG_TextboxSetText(&fb_window, (FB_LIST_SIZE+1), UG_TextboxGetText(&fb_window, fb_selected_line));
       break;
       
     default:
       break;
     }
   }
+}
+
+void fb_draw_highlight(int16_t selected_line)
+{
+  // Deselect the previously selected line
+  UG_TextboxSetBackColor(&fb_window, fb_selected_line, C_WHITE);
+
+  // Change the selectionto the newly selected line
+  fb_selected_line = selected_line;
+
+  // Limit the selection max and min.
+  // TODO: Scroll through directory entries
+  if (fb_selected_line <= 0) { fb_selected_line = 0; }
+  if (fb_selected_line >= FB_LIST_SIZE-1) { fb_selected_line = FB_LIST_SIZE-1; }
+
+  // Redraw highlight line in new location
+  UG_TextboxSetBackColor(&fb_window, fb_selected_line, selected_color);
+
+  // Debug output
+  sprintf(selected_file_buffer, "sel: %d", fb_selected_line); 
+  UG_TextboxSetText(&fb_window, (FB_LIST_SIZE+1), selected_file_buffer);
 }
