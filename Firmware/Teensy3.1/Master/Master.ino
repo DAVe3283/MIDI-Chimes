@@ -843,6 +843,8 @@ void draw_fb_window()
   fb_draw_highlight(0);
 }
 
+int8_t fb_skip_files(0);
+
 void fb_window_callback(UG_MESSAGE* msg)
 {
   if ((msg->type == MSG_TYPE_OBJECT) &&
@@ -880,6 +882,7 @@ void fb_window_callback(UG_MESSAGE* msg)
         // If the selected item is the ".." directory, shorten the path by one level
         char* p = strrchr(selected_path_buffer, '/');
         *p = 0;  // Null terminate at the found character
+        fb_skip_files = 0;  // Reset file skip for list
         fb_draw_highlight(0);
       }
       break;
@@ -904,13 +907,14 @@ void fb_draw_highlight(int16_t selected_line)
   if (fb_selected_line <= 0)
   { 
     // TODO: Scroll through directory entries
-    update_file_list();
+    fb_skip_files--;
+    fb_skip_files = (fb_skip_files < 0) ? 0 : fb_skip_files;
     fb_selected_line = 0;
   }
   if (fb_selected_line >= FB_LIST_SIZE-1)
   {
     // TODO: Scroll through directory entries
-    update_file_list();
+    fb_skip_files++;
     fb_selected_line = FB_LIST_SIZE-1;
   }
 
@@ -918,6 +922,7 @@ void fb_draw_highlight(int16_t selected_line)
   UG_TextboxSetBackColor(&fb_window, 2*fb_selected_line+1, selected_color);
 
   // Update file list text
+  update_file_list();
   for(int i = 0; i < FB_LIST_SIZE; i++)
   {
     UG_TextboxSetText(&fb_window, 2*i, file_icon_buffer[i]);
@@ -932,7 +937,15 @@ void update_file_list()
   if (!dirFile.isOpen() && !dirFile.open(selected_path_buffer, O_READ))
   {
     draw_BSOD(tft);
-    sd.errorHalt(&tft, "open root failed");
+    sd.errorHalt(&tft, "open path failed");
+  }
+
+  // Skip some files if we've hit the bottom of the file list
+  uint8_t s = 0;
+  while(s < fb_skip_files && file.openNext(&dirFile, O_READ))
+  {
+    s++;
+    file.close();
   }
 
   uint16_t files_found(0);
@@ -945,7 +958,7 @@ void update_file_list()
     files_found++;
   }
 
-  while (files_found < FB_LIST_SIZE-1 && file.openNext(&dirFile, O_READ))
+  while (files_found < FB_LIST_SIZE && file.openNext(&dirFile, O_READ))
   {
     // Skip directories and hidden files.
     if (file.isHidden())
