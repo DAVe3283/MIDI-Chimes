@@ -869,10 +869,17 @@ void fb_window_callback(UG_MESSAGE* msg)
       strcpy(selected_file_buffer, UG_TextboxGetText(&fb_window, sel_id));
       UG_TextboxSetText(&fb_window, curr_id, selected_file_buffer);
 
-      // If the selected item is a directory, append it to the path to be opened
       if(strcmp(UG_TextboxGetText(&fb_window, sel_id-1), fa_icon_folder_closed) == 0)
       {
+        // If the selected item is a directory, append it to the path to be opened
         sprintf(selected_path_buffer, "%s/%s", selected_path_buffer, selected_file_buffer);
+        fb_draw_highlight(0);
+      }
+      else if(strcmp(UG_TextboxGetText(&fb_window, sel_id-1), fa_icon_level_up) == 0)
+      {
+        // If the selected item is the ".." directory, shorten the path by one level
+        char* p = strrchr(selected_path_buffer, '/');
+        *p = 0;  // Null terminate at the found character
         fb_draw_highlight(0);
       }
       break;
@@ -890,6 +897,8 @@ void fb_draw_highlight(int16_t selected_line)
 
   // Change the selectionto the newly selected line
   fb_selected_line = selected_line;
+
+  // TODO: Prevent highlighting empty lines
 
   // Limit the selection max and min.
   if (fb_selected_line <= 0)
@@ -927,8 +936,16 @@ void update_file_list()
   }
 
   uint16_t files_found(0);
-  const uint16_t nMax(FB_LIST_SIZE); // Max files to list
-  while (files_found < nMax && file.openNext(&dirFile, O_READ))
+
+  // Item 0 is ".." if we are below the root
+  if(strcmp(selected_path_buffer, "/") != 0)
+  {
+    strcpy(file_icon_buffer[files_found], fa_icon_level_up);
+    strcpy(file_list_buffer[files_found], "..");
+    files_found++;
+  }
+
+  while (files_found < FB_LIST_SIZE-1 && file.openNext(&dirFile, O_READ))
   {
     // Skip directories and hidden files.
     if (file.isHidden())
