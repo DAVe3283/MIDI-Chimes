@@ -119,6 +119,7 @@ const uint8_t note_map[num_slaves][notes_per_slave] =
 // TODO: use real data once the chimes are hooked up
 
 // Duty Cycle Settings
+// This matches the slaves, and isn't directly used by the master
 const uint8_t pwm_bits(12); // 0 - 4095
 const float minimum_pwm(0.55); // 55%, lowest reliable impact to produce a chime
 const uint16_t maximum_dc((1 << pwm_bits) - 1);
@@ -137,6 +138,10 @@ const uint8_t lcd_reset_pin(7);
 const uint8_t lcd_cs_pin(10);
 const uint8_t lcd_dc_pin(9);
 const uint8_t touch_cs_pin(8);
+// Backlight
+const uint8_t lcd_backlight_pin(3);
+const uint8_t lcd_bl_pwm_bits(16);
+const uint32_t lcd_bl_pwm_freq(549); // Hz
 // Calibration
 const uint16_t ts_min_x( 150);
 const uint16_t ts_max_x(3800);
@@ -297,15 +302,17 @@ void setup()
   // Configure LED
   pinMode(led_pin, OUTPUT);
 
-  // Debug trigger
-  digitalWrite(led_pin, HIGH);
+  // Configure LCD backlight
+  pinMode(lcd_backlight_pin, OUTPUT);
+  analogWriteResolution(lcd_bl_pwm_bits);
+  analogWriteFrequency(lcd_backlight_pin, lcd_bl_pwm_freq);
+  analogWrite(lcd_backlight_pin, (1 << lcd_bl_pwm_bits) - 1);
 
   // Configure TFT
   tft.begin();
   tft.setRotation(1); // Landscape
   tft.fillScreen(background_color);
 
-  digitalWrite(led_pin, LOW);
   // Configure GUI
   UG_Init(&gui, UserPixelSetFunction, tft.width(), tft.height());
   UG_DriverRegister(DRIVER_DRAW_LINE, (void*)_HW_DrawLine);
@@ -320,15 +327,12 @@ void setup()
 
   // Initialize Touch Screen
   UG_ConsolePutString("Starting touchscreen...");
-  ser.print("ts.begin()");
-  digitalWrite(led_pin, HIGH);
   if (!ts.begin())
   {
     draw_BSOD(tft);
     tft.println("Unable to start touchscreen.");
     while (1) { yield(); }
   }
-  digitalWrite(led_pin, LOW);
   UG_ConsolePutString("done.\n");
 
   // Configure I2C
@@ -337,14 +341,11 @@ void setup()
 
   // Initialize SD Card
   UG_ConsolePutString("Starting SD Card...");
-  ser.print("sd.begin()");
-  digitalWrite(led_pin, HIGH);
   if (!sd.begin(sd_cs_pin))
   {
     draw_BSOD(tft);
     sd.initErrorHalt(&tft);
   }
-  digitalWrite(led_pin, LOW);
   UG_ConsolePutString("done.\n");
 
   // TODO: read config file
