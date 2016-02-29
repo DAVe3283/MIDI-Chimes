@@ -79,6 +79,7 @@ extern "C"
 // #include <font_LiberationSansBoldItalic.h>
 // #include <font_AwesomeF000.h>
 #include "FontAwesome_mod_50X40.h"
+#include "FontAwesome_mod_15X13.h"
 
 // Blue Screen of Death :P
 #include "bsod_win10.h"
@@ -159,6 +160,7 @@ const char fa_icon_vol_dn[] = "F";         // Volume Down
 const char fa_icon_vol_up[] = "G";         // Volume Up
 const char fa_icon_level_up[] = "]";       // Level Up
 const char fa_icon_level_down[] = "^";     // Level Down
+const char fa_icon_hidden[] = "[";         // No Eye (slash through eye)
 const char fa_icon_folder_closed[] = "_";  // Folder, Closed (solid)
 const char fa_icon_folder_open[] = "a";    // Folder, Open (solid)
 const char fa_icon_file_generic[] = "d";   // File, Generic (outline)
@@ -275,10 +277,12 @@ UG_BUTTON fb_cancel_button;
 UG_BUTTON fb_select_button;
 UG_TEXTBOX fb_current_path;
 UG_TEXTBOX fb_file_list[FB_LIST_SIZE];
-UG_OBJECT fb_window_buffer[FB_LIST_SIZE+6];
+UG_TEXTBOX fb_icon_list[FB_LIST_SIZE];
+UG_OBJECT fb_window_buffer[(2*FB_LIST_SIZE)+6];
 char selected_file_buffer[MAX_NAME] = { 0 };
 char selected_path_buffer[MAX_PATH] = "/";
 char file_list_buffer[FB_LIST_SIZE][MAX_NAME] = { 0 };
+char file_icon_buffer[FB_LIST_SIZE][MAX_NAME] = { 0 };
 
 // Settings Window
 UG_WINDOW settings_window;
@@ -750,6 +754,7 @@ void draw_fb_window()
   const uint16_t height(UG_WindowGetInnerHeight(&fb_window));
   const uint16_t padding(5);
   const uint16_t button_size(50);
+  const uint16_t icon_size(20);
 
   // Scroll up button (top right)
   UG_ButtonCreate(&fb_window, &fb_up_button, BTN_ID_0,
@@ -791,12 +796,27 @@ void draw_fb_window()
   update_file_list();
 
   const uint16_t line_height = 16;  // Height of a single line in the file list. Depends on font
+  uint8_t txb_id(0);
   // File list (main area)
   for (int i = 0; i < FB_LIST_SIZE; i++)
   {
-    uint8_t txb_id = i;
-    UG_TextboxCreate(&fb_window, &fb_file_list[i], txb_id,
+    // File icon textbox
+    txb_id = 2*i;
+    UG_TextboxCreate(&fb_window, &fb_icon_list[i], txb_id,
       padding,
+      padding + button_size + padding + (i*line_height),
+      padding + icon_size,
+      padding + button_size + padding + ((i+1)*line_height));
+    UG_TextboxSetFont(&fb_window, txb_id, &font_FontAwesome_mod_15X13);
+    UG_TextboxSetAlignment(&fb_window, txb_id, ALIGN_CENTER);
+    // UG_TextboxSetBackColor(&fb_window, txb_id, UG_WindowGetBackColor(&fb_window));
+    UG_TextboxSetBackColor(&fb_window, txb_id, C_WHITE);
+    UG_TextboxSetForeColor(&fb_window, txb_id, C_BLACK);
+
+    // File name textbox
+    txb_id++;
+    UG_TextboxCreate(&fb_window, &fb_file_list[i], txb_id,
+      padding + icon_size,
       padding + button_size + padding + (i*line_height),
       width - padding - button_size - padding,
       padding + button_size + padding + ((i+1)*line_height));
@@ -804,22 +824,20 @@ void draw_fb_window()
     UG_TextboxSetAlignment(&fb_window, txb_id, ALIGN_TOP_LEFT);
     UG_TextboxSetBackColor(&fb_window, txb_id, C_WHITE);
     UG_TextboxSetForeColor(&fb_window, txb_id, C_BLACK);
-
-    // Debug output
-    // sprintf(file_list_buffer[i], "file%d.mid", txb_id);
   }
 
   // Current path text box (top center)
-  UG_TextboxCreate(&fb_window, &fb_current_path, (FB_LIST_SIZE+1),
+  txb_id = (2*FB_LIST_SIZE)+1;
+  UG_TextboxCreate(&fb_window, &fb_current_path, txb_id,
     padding + button_size + padding,
     padding,
     width - padding - button_size - padding,
     padding + button_size);
-  UG_TextboxSetFont(&fb_window, (FB_LIST_SIZE+1), &FONT_10X16);
-  UG_TextboxSetAlignment(&fb_window, (FB_LIST_SIZE+1), ALIGN_CENTER);
-  UG_TextboxSetBackColor(&fb_window, (FB_LIST_SIZE+1), C_WHITE);
-  UG_TextboxSetForeColor(&fb_window, (FB_LIST_SIZE+1), C_BLACK);
-  UG_TextboxSetText(&fb_window, (FB_LIST_SIZE+1), "active_file.mid");
+  UG_TextboxSetFont(&fb_window, txb_id, &FONT_10X16);
+  UG_TextboxSetAlignment(&fb_window, txb_id, ALIGN_CENTER);
+  UG_TextboxSetBackColor(&fb_window, txb_id, C_WHITE);
+  UG_TextboxSetForeColor(&fb_window, txb_id, C_BLACK);
+  UG_TextboxSetText(&fb_window, txb_id, "active_file.mid");
 
   // Highlight the first line
   fb_draw_highlight(0);
@@ -831,6 +849,8 @@ void fb_window_callback(UG_MESSAGE* msg)
       (msg->id == OBJ_TYPE_BUTTON) &&
       (msg->event == BTN_EVENT_CLICKED))
   {
+    uint8_t sel_id = (2 * fb_selected_line) + 1;
+    uint8_t curr_id = (2 * FB_LIST_SIZE) + 1;
     switch (msg->sub_id)
     {
     case BTN_ID_0:  // up button
@@ -846,7 +866,15 @@ void fb_window_callback(UG_MESSAGE* msg)
       break;
 
     case BTN_ID_3:  // Select file/folder
-      UG_TextboxSetText(&fb_window, (FB_LIST_SIZE+1), UG_TextboxGetText(&fb_window, fb_selected_line));
+      strcpy(selected_file_buffer, UG_TextboxGetText(&fb_window, sel_id));
+      UG_TextboxSetText(&fb_window, curr_id, selected_file_buffer);
+
+      // If the selected item is a directory, append it to the path to be opened
+      if(strcmp(UG_TextboxGetText(&fb_window, sel_id-1), fa_icon_folder_closed) == 0)
+      {
+        sprintf(selected_path_buffer, "%s/%s", selected_path_buffer, selected_file_buffer);
+        fb_draw_highlight(0);
+      }
       break;
       
     default:
@@ -858,7 +886,7 @@ void fb_window_callback(UG_MESSAGE* msg)
 void fb_draw_highlight(int16_t selected_line)
 {
   // Deselect the previously selected line
-  UG_TextboxSetBackColor(&fb_window, fb_selected_line, C_WHITE);
+  UG_TextboxSetBackColor(&fb_window, 2*fb_selected_line+1, C_WHITE);
 
   // Change the selectionto the newly selected line
   fb_selected_line = selected_line;
@@ -878,24 +906,21 @@ void fb_draw_highlight(int16_t selected_line)
   }
 
   // Redraw highlight line in new location
-  UG_TextboxSetBackColor(&fb_window, fb_selected_line, selected_color);
+  UG_TextboxSetBackColor(&fb_window, 2*fb_selected_line+1, selected_color);
 
   // Update file list text
   for(int i = 0; i < FB_LIST_SIZE; i++)
   {
-    UG_TextboxSetText(&fb_window, i, file_list_buffer[i]);
+    UG_TextboxSetText(&fb_window, 2*i, file_icon_buffer[i]);
+    UG_TextboxSetText(&fb_window, 2*i+1, file_list_buffer[i]);
   }
-
-  // Debug output
-  sprintf(selected_file_buffer, "sel: %d", fb_selected_line); 
-  UG_TextboxSetText(&fb_window, (FB_LIST_SIZE+1), selected_file_buffer);
 }
 
 void update_file_list()
 {
   // List files in directory.
   ser.println("Calling dirFile.open()"); // DEBUG
-  if (!dirFile.isOpen() && !dirFile.open("/", O_READ))
+  if (!dirFile.isOpen() && !dirFile.open(selected_path_buffer, O_READ))
   {
     draw_BSOD(tft);
     sd.errorHalt(&tft, "open root failed");
@@ -908,18 +933,34 @@ void update_file_list()
     // Skip directories and hidden files.
     if (file.isHidden())
     {
-      // skip
+      // skip hidden files
+      // strcpy(file_icon_buffer[files_found], fa_icon_hidden);
     }
     else if(file.isSubDir())
     {
-      // TODO: Show entry,, but with an icon or something
+      strcpy(file_icon_buffer[files_found], fa_icon_folder_closed);
+      file.getName(file_list_buffer[files_found], MAX_NAME);
+      files_found++;
     }
     else
     {
+      strcpy(file_icon_buffer[files_found], fa_icon_file_generic);
       file.getName(file_list_buffer[files_found], MAX_NAME);
+      files_found++;
     }
-
-    files_found++;
+    
     file.close();
   }
+
+  // Blank out any unused entries in the list
+  if (files_found < FB_LIST_SIZE)
+  {
+    for (; files_found < FB_LIST_SIZE; files_found++)
+    {
+      strcpy(file_list_buffer[files_found], "");
+      strcpy(file_icon_buffer[files_found], "");
+    }
+  }
+
+  dirFile.close();
 }
