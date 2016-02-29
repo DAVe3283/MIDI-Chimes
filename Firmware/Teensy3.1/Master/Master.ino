@@ -894,7 +894,8 @@ void fb_draw_highlight(int16_t selected_line)
 void update_file_list()
 {
   // List files in directory.
-  if (!dirFile.open("/", O_READ))
+  ser.println("Calling dirFile.open()"); // DEBUG
+  if (!dirFile.isOpen() && !dirFile.open("/", O_READ))
   {
     draw_BSOD(tft);
     sd.errorHalt(&tft, "open root failed");
