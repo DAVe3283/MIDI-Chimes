@@ -50,46 +50,7 @@ because it does some cool stuff.
 
 ## Schematics
 
-See the "PCB & Schematic" directory.
-
-### Data Connector Pinout
-
-| Pin |  Description  |
-| --- | ------------- |
-|   1 | Ground        |
-|   2 | +5V_SB        |
-|   3 | I2C SCL       |
-|   4 | I2C SDA       |
-|   5 | Address Latch |
-|   6 | PS_EN         |
-
-+5V_SB is 5V standby power from the PSU.
-PS_EN is the power supply enable line.
-Address latch is used to auto-assign I2C addresses on startup (future use).
-
-If I did this right, no magic smoke should escape if (when) someone plugs this
-connector in backwards. Off-by-one... not so much.
-
-### Transistor Feedback Voltage
-
-I am using a 160k / 10k resistor divider, with a 1 uF capacitor in parallel with
-the 10k resistor. Using the Teensy3's internal 1.2V precision reference, I can
-read a transistor voltage of 0 to 20.4 volts. The capacitor filters out the PWM
-frequency, letting me be extremely lazy with my firmware when checking how
-things are working.
-
-### Master
-
-I need external pullup resistors on the I2C bus, as the internal Teensy ones
-don't work all that well. For high speed, I probably want 1.5k or so.
-
-MIDI uses an opto-isolator. I should pick up some 6N138 opto-isolators.
-
-http://www.mouser.com/ProductDetail/Molex/15-91-2140/?qs=sGAEpiMZZMttdt6ek4ZYDGcRuHgvKenX
-    This is for the pads on the back of the Teensy.
-
-I think I can use the MAB5SH part in Eagle as the footprint for the MIDI conenctor.
-    Yeah, I think we're good. But just in case: http://www.newark.com/hirschmann/mab-5-sh/din-audio-video-connector-socket/dp/61T4646
+See the "PCB & Schematic" directory, and the [PCB.md](Notes/PCB.md) file.
 
 ## License
 
