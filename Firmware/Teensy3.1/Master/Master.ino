@@ -37,8 +37,14 @@
 //       * Default should probably be scale
 //     * Physical MIDI port is OUT or THRU
 //     * Pass USB MIDI to physical MIDI OUT? (or should I always just do this?)
-// * Read from SD card
-//   * Basic file browser?
+// * Basic file browser
+//   * Handle long file names better (pick a sane max path length, not 32k...)
+//     * Add "..." to names that don't fit
+//   * Print full path to file in currently selected path dialog
+//     * Wrap every 17 characters (that is the length of the textbox)
+//   * Sort entries alphabetically
+//   * Dynamically show/hide the ".." (up) entry as the list is scrolled
+//   * Stop scrolling at the last item
 // * Playback of MIDI files (from SD card)
 //   * Play doorbel tone from sd "doorbell" folder :P
 // * Save options to EEPROM (or FLASH or whatever the Teensy has)
@@ -155,6 +161,7 @@ const uint16_t button_text_disabled(C_GRAY);
 const uint16_t selected_color(C_GREEN);
 
 // Icons
+const char fa_icon_blank[] = "";
 const char fa_icon_settings[] = "u";       // Sliders
 const char fa_icon_vol_dn[] = "F";         // Volume Down
 const char fa_icon_vol_up[] = "G";         // Volume Up
@@ -267,9 +274,9 @@ UG_OBJECT main_window_buffer[5];
 char volume_text_buffer[5] = { 0 };
 
 // File Browse window
-#define FB_LIST_SIZE 7
-#define MAX_NAME 32
-#define MAX_PATH 256
+#define FB_LIST_SIZE 7 // How many files we can fit on screen at once
+#define MAX_NAME 21 // This is actually 255 characters for FAT32, but we can only fit 20 characters on screen
+#define MAX_PATH 256 // This is actually 32,760 characters for FAT32 O_o
 UG_WINDOW fb_window;
 UG_BUTTON fb_up_button;
 UG_BUTTON fb_down_button;
@@ -279,10 +286,9 @@ UG_TEXTBOX fb_current_path;
 UG_TEXTBOX fb_file_list[FB_LIST_SIZE];
 UG_TEXTBOX fb_icon_list[FB_LIST_SIZE];
 UG_OBJECT fb_window_buffer[(2*FB_LIST_SIZE)+6];
-char selected_file_buffer[MAX_NAME] = { 0 };
 char selected_path_buffer[MAX_PATH] = "/";
 char file_list_buffer[FB_LIST_SIZE][MAX_NAME] = { 0 };
-char file_icon_buffer[FB_LIST_SIZE][MAX_NAME] = { 0 };
+const char* file_icon[FB_LIST_SIZE];
 
 // Settings Window
 UG_WINDOW settings_window;
@@ -868,13 +874,11 @@ void fb_window_callback(UG_MESSAGE* msg)
       break;
 
     case BTN_ID_3:  // Select file/folder
-      strcpy(selected_file_buffer, UG_TextboxGetText(&fb_window, sel_id));
-      UG_TextboxSetText(&fb_window, curr_id, selected_file_buffer);
-
       if(strcmp(UG_TextboxGetText(&fb_window, sel_id-1), fa_icon_folder_closed) == 0)
       {
         // If the selected item is a directory, append it to the path to be opened
-        sprintf(selected_path_buffer, "%s/%s", selected_path_buffer, selected_file_buffer);
+        sprintf(selected_path_buffer, "%s/%s", selected_path_buffer, file_list_buffer[fb_selected_line]);
+        fb_skip_files = 0;  // Reset file skip for list
         fb_draw_highlight(0);
       }
       else if(strcmp(UG_TextboxGetText(&fb_window, sel_id-1), fa_icon_level_up) == 0)
@@ -885,8 +889,13 @@ void fb_window_callback(UG_MESSAGE* msg)
         fb_skip_files = 0;  // Reset file skip for list
         fb_draw_highlight(0);
       }
+      else
+      {
+        // If the selected item is a regular file
+        UG_TextboxSetText(&fb_window, curr_id, file_list_buffer[fb_selected_line]);
+      }
       break;
-      
+
     default:
       break;
     }
@@ -904,14 +913,14 @@ void fb_draw_highlight(int16_t selected_line)
   // TODO: Prevent highlighting empty lines
 
   // Limit the selection max and min.
-  if (fb_selected_line <= 0)
+  if (fb_selected_line < 0)
   { 
     // TODO: Scroll through directory entries
     fb_skip_files--;
     fb_skip_files = (fb_skip_files < 0) ? 0 : fb_skip_files;
     fb_selected_line = 0;
   }
-  if (fb_selected_line >= FB_LIST_SIZE-1)
+  if (fb_selected_line >= FB_LIST_SIZE)
   {
     // TODO: Scroll through directory entries
     fb_skip_files++;
@@ -925,7 +934,7 @@ void fb_draw_highlight(int16_t selected_line)
   update_file_list();
   for(int i = 0; i < FB_LIST_SIZE; i++)
   {
-    UG_TextboxSetText(&fb_window, 2*i, file_icon_buffer[i]);
+    UG_TextboxSetText(&fb_window, 2*i, file_icon[i]);
     UG_TextboxSetText(&fb_window, 2*i+1, file_list_buffer[i]);
   }
 }
@@ -953,7 +962,7 @@ void update_file_list()
   // Item 0 is ".." if we are below the root
   if(strcmp(selected_path_buffer, "/") != 0)
   {
-    strcpy(file_icon_buffer[files_found], fa_icon_level_up);
+    file_icon[files_found] = fa_icon_level_up;
     strcpy(file_list_buffer[files_found], "..");
     files_found++;
   }
@@ -964,17 +973,17 @@ void update_file_list()
     if (file.isHidden())
     {
       // skip hidden files
-      // strcpy(file_icon_buffer[files_found], fa_icon_hidden);
+      // file_icon[files_found] = fa_icon_hidden;
     }
     else if(file.isSubDir())
     {
-      strcpy(file_icon_buffer[files_found], fa_icon_folder_closed);
+      file_icon[files_found] = fa_icon_folder_closed;
       file.getName(file_list_buffer[files_found], MAX_NAME);
       files_found++;
     }
     else
     {
-      strcpy(file_icon_buffer[files_found], fa_icon_file_generic);
+      file_icon[files_found] = fa_icon_file_generic;
       file.getName(file_list_buffer[files_found], MAX_NAME);
       files_found++;
     }
@@ -987,8 +996,8 @@ void update_file_list()
   {
     for (; files_found < FB_LIST_SIZE; files_found++)
     {
-      strcpy(file_list_buffer[files_found], "");
-      strcpy(file_icon_buffer[files_found], "");
+      file_icon[files_found] = fa_icon_blank;
+      file_list_buffer[files_found][0] = 0;
     }
   }
 
