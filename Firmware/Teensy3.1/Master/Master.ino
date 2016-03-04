@@ -14,19 +14,20 @@
 // * This could be an I2C timeout, which I am not handling.
 // *****************************************************************************
 // * Velocity map (MIDI is 0-127, I need a PWM value ~50%-100%)
+//   * Working, but I should calibrate PWM value to chime volume with a SPL meter
 //   * Per-note velocity map? This would make the chimes perfectly linear
 //   * Or a velocity formula (per note?) might be better?
 // * Actually implement master volume
-// * Physical MIDI support
-//   * When a note doesn't match the current channel, pass it to MIDI out
-//   * Software MIDI "thru" support (pass all inputs to the output when thru is on)
-//     * This will be complex to handle the system common message, which is variable length
+// * See Notes/MIDI.md for channel, program, and OUT/THRU information.
 // * Implement I2C timeout (properly) & handle I2C errors
 //   * Probably need a very short timeout (1ms or less) to avoid messing up song
 //     * Or should we just throw a giant error and abort playback?
-// * Double-check pin config for SPI
-//   * If I can move the data/command pin off a hardware CS pin, I can probably
-//     use that hardware pin for the touch screen or SD card (speed things up)
+// * Implement settings
+//   * Store them to the SD card
+// * Handle MIDI program change events
+//   * We are technically Program 0xE "Tubular Bells"
+//   * We might want to handle other things, or everything on the channel?
+//     * This should probably be a setting.
 // * Make the display do useful things
 //   * Show errors
 //   * Show input source (USB or physical MIDI)
@@ -41,8 +42,6 @@
 //   * Basic file browser?
 // * Playback of MIDI files (from SD card)
 //   * Play doorbel tone from sd "doorbell" folder :P
-// * Save options to EEPROM (or FLASH or whatever the Teensy has)
-//   * Or save them to the SD card?
 // -----------------------------------------------------------------------------
 
 // Comment this line out if using the resistive touchscreen layer
@@ -72,12 +71,6 @@ extern "C"
 #endif
 
 // Fonts
-// #include <font_LiberationMono.h>
-// #include <font_LiberationSans.h>
-// #include <font_LiberationSansBold.h>
-// #include <font_LiberationSansItalic.h>
-// #include <font_LiberationSansBoldItalic.h>
-// #include <font_AwesomeF000.h>
 #include "FontAwesome_mod_50X40.h"
 
 // Blue Screen of Death :P
@@ -171,14 +164,6 @@ const char fa_icon_file_picture[] = "k";   // File, Picture / Image (outline)
 const char fa_icon_file_sound[] = "m";     // File, Sound / Music (outline)
 const char fa_icon_file_config[] = "o";    // File, Code / Config (outline)
 
-// DEBUG: volume button sizes (until I make a class and do this right)
-const int16_t button_vol_d_x(  5);
-const int16_t button_vol_d_y(185);
-const int16_t button_vol_u_x(265);
-const int16_t button_vol_u_y(185);
-const int16_t button_vol_w(50);
-const int16_t button_vol_h(50);
-
 // MIDI Commands
 const uint8_t midi_cmd_note_off(0x80);
 const uint8_t midi_cmd_note_on(0x90);
@@ -189,16 +174,18 @@ const uint8_t midi_cmd_aftertouch_mono(0xD0);
 const uint8_t midi_cmd_pitch_bend(0xE0);
 const uint8_t midi_cmd_system_exclusive(0xF0);
 
+// MIDI Programs (Instruments)
+const uint8_t midi_prog_tubular_bells(0xE);
+
 
 // -----------------------------------------------------------------------------
 // Declarations
 // -----------------------------------------------------------------------------
-void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity);
 // void OnNoteOff(uint8_t channel, uint8_t note, uint8_t velocity); // Not needed
-// TODO: handle more MIDI stuff?
+void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity);
 // void OnVelocityChange(uint8_t channel, uint8_t note, uint8_t velocity);
 // void OnControlChange(uint8_t channel, uint8_t control, uint8_t value);
-// void OnProgramChange(uint8_t channel, uint8_t program);
+void OnProgramChange(uint8_t channel, uint8_t program);
 // void OnAfterTouch(uint8_t channel, uint8_t pressure);
 // void OnPitchChange(uint8_t channel, int pitch);
 
@@ -240,10 +227,15 @@ void fb_draw_highlight(int16_t line);
 // -----------------------------------------------------------------------------
 
 // User settings
-uint8_t our_channel(0); // Current channel (1-16, 0 means play all)
+uint8_t our_channel(0); // Current channel (0-15)
 int8_t master_volume(100); // Master volume (0-100, 0 means mute, steps of 10)
 bool override_velocity(false); // Override velocity to master volume (true), or scale it by master volume (false)
+bool play_all_programs(false); // Play all programs (instruments), or just Tubular Bells?
+
 int16_t fb_selected_line(0); // Which line in the file browse list is currently highlighted
+
+// MIDI state
+bool play_this_program(true); // Do we play notes for the current program?
 
 // Timers
 elapsedMicros message_blink_timer;
@@ -451,8 +443,9 @@ void setup()
   // }
 
   // Configure USB MIDI
+  // usbMIDI.setHandleNoteOff(OnNoteOff); // Not needed (might for OUT/THRU?)
   usbMIDI.setHandleNoteOn(OnNoteOn);
-  // usbMIDI.setHandleNoteOff(OnNoteOff); // Not needed
+  usbMIDI.setHandleProgramChange(OnProgramChange);
   // TODO: handle more MIDI stuff?
 
   // Configure hardware MIDI
@@ -552,11 +545,14 @@ void loop()
         OnNoteOn(channel, midi_buffer[0], midi_buffer[1]);
         break;
 
+      case midi_cmd_program_change:
+        OnProgramChange(channel, midi_buffer[0]);
+        break;
+
       // Not implemented
       case midi_cmd_note_off:
       case midi_cmd_aftertouch:
       case midi_cmd_control_change:
-      case midi_cmd_program_change:
       case midi_cmd_aftertouch_mono:
       case midi_cmd_pitch_bend:
         break;
@@ -624,8 +620,8 @@ void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
     return;
   }
 
-  // Are we handling this channel?
-  if ((our_channel == 0) || (our_channel == channel))
+  // Are we handling this channel & program (instrument)?
+  if ((channel == our_channel) && play_this_program)
   {
     // Lookup note
     uint8_t slave_address, slave_channel;
@@ -635,6 +631,22 @@ void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
       send_chime(slave_address, slave_channel, scale_midi_velocity(velocity));
       digitalWrite(led_pin, LOW); // diagnostics
     }
+  }
+  else
+  {
+    // TODO: MIDI out/thru
+  }
+}
+
+void OnProgramChange(uint8_t channel, uint8_t program)
+{
+  if (channel == our_channel)
+  {
+    play_this_program = play_all_programs || (program == midi_prog_tubular_bells);
+  }
+  else
+  {
+    // TODO: MIDI out/thru
   }
 }
 
