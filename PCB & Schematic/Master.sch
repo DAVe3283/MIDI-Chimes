@@ -6535,6 +6535,77 @@ Audio, scart, microphone, headphone&lt;p&gt;
 </deviceset>
 </devicesets>
 </library>
+<library name="diode">
+<description>&lt;b&gt;Diodes&lt;/b&gt;&lt;p&gt;
+Based on the following sources:
+&lt;ul&gt;
+&lt;li&gt;Motorola : www.onsemi.com
+&lt;li&gt;Fairchild : www.fairchildsemi.com
+&lt;li&gt;Philips : www.semiconductors.com
+&lt;li&gt;Vishay : www.vishay.de
+&lt;/ul&gt;
+&lt;author&gt;Created by librarian@cadsoft.de&lt;/author&gt;</description>
+<packages>
+<package name="DO41-10">
+<description>&lt;B&gt;DIODE&lt;/B&gt;&lt;p&gt;
+diameter 2.54 mm, horizontal, grid 10.16 mm</description>
+<wire x1="2.032" y1="-1.27" x2="-2.032" y2="-1.27" width="0.1524" layer="21"/>
+<wire x1="2.032" y1="-1.27" x2="2.032" y2="1.27" width="0.1524" layer="21"/>
+<wire x1="-2.032" y1="1.27" x2="2.032" y2="1.27" width="0.1524" layer="21"/>
+<wire x1="-2.032" y1="1.27" x2="-2.032" y2="-1.27" width="0.1524" layer="21"/>
+<wire x1="5.08" y1="0" x2="4.064" y2="0" width="0.762" layer="51"/>
+<wire x1="-5.08" y1="0" x2="-4.064" y2="0" width="0.762" layer="51"/>
+<wire x1="-0.635" y1="0" x2="0" y2="0" width="0.1524" layer="21"/>
+<wire x1="1.016" y1="0.635" x2="1.016" y2="-0.635" width="0.1524" layer="21"/>
+<wire x1="1.016" y1="-0.635" x2="0" y2="0" width="0.1524" layer="21"/>
+<wire x1="0" y1="0" x2="1.524" y2="0" width="0.1524" layer="21"/>
+<wire x1="0" y1="0" x2="1.016" y2="0.635" width="0.1524" layer="21"/>
+<wire x1="0" y1="0.635" x2="0" y2="0" width="0.1524" layer="21"/>
+<wire x1="0" y1="0" x2="0" y2="-0.635" width="0.1524" layer="21"/>
+<pad name="A" x="5.08" y="0" drill="1.1176"/>
+<pad name="C" x="-5.08" y="0" drill="1.1176"/>
+<text x="-2.032" y="1.651" size="1.27" layer="25" ratio="10">&gt;NAME</text>
+<text x="-2.032" y="-2.794" size="1.27" layer="27" ratio="10">&gt;VALUE</text>
+<rectangle x1="-1.651" y1="-1.27" x2="-1.143" y2="1.27" layer="21"/>
+<rectangle x1="2.032" y1="-0.381" x2="3.937" y2="0.381" layer="21"/>
+<rectangle x1="-3.937" y1="-0.381" x2="-2.032" y2="0.381" layer="21"/>
+</package>
+</packages>
+<symbols>
+<symbol name="D">
+<wire x1="-1.27" y1="-1.27" x2="1.27" y2="0" width="0.254" layer="94"/>
+<wire x1="1.27" y1="0" x2="-1.27" y2="1.27" width="0.254" layer="94"/>
+<wire x1="1.27" y1="1.27" x2="1.27" y2="0" width="0.254" layer="94"/>
+<wire x1="-1.27" y1="1.27" x2="-1.27" y2="-1.27" width="0.254" layer="94"/>
+<wire x1="1.27" y1="0" x2="1.27" y2="-1.27" width="0.254" layer="94"/>
+<text x="2.54" y="0.4826" size="1.778" layer="95">&gt;NAME</text>
+<text x="2.54" y="-2.3114" size="1.778" layer="96">&gt;VALUE</text>
+<pin name="A" x="-2.54" y="0" visible="off" length="short" direction="pas"/>
+<pin name="C" x="2.54" y="0" visible="off" length="short" direction="pas" rot="R180"/>
+<text x="-2.54" y="0" size="0.4064" layer="99" align="center">SpiceOrder 1</text>
+<text x="2.54" y="0" size="0.4064" layer="99" align="center">SpiceOrder 2</text>
+</symbol>
+</symbols>
+<devicesets>
+<deviceset name="SRP100" prefix="D">
+<description>&lt;B&gt;DIODE&lt;/B&gt;</description>
+<gates>
+<gate name="1" symbol="D" x="0" y="0"/>
+</gates>
+<devices>
+<device name="" package="DO41-10">
+<connects>
+<connect gate="1" pin="A" pad="A"/>
+<connect gate="1" pin="C" pad="C"/>
+</connects>
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+</devicesets>
+</library>
 </libraries>
 <attributes>
 </attributes>
@@ -6557,9 +6628,8 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <part name="P+2" library="supply1" deviceset="+5V" device=""/>
 <part name="GND1" library="supply1" deviceset="GND" device=""/>
 <part name="C1" library="resistor" deviceset="C-US" device="C0805" value="0.1u"/>
-<part name="R2" library="resistor" deviceset="R-US_" device="R0805" value="1k"/>
-<part name="R3" library="resistor" deviceset="R-US_" device="R0805" value="10k"/>
-<part name="+3V2" library="supply1" deviceset="+3V3" device=""/>
+<part name="R2" library="resistor" deviceset="R-US_" device="R0805" value="10k"/>
+<part name="R3" library="resistor" deviceset="R-US_" device="R0805" value="1k"/>
 <part name="X1" library="con-hirschmann" deviceset="MAB5SH" device=""/>
 <part name="R4" library="resistor" deviceset="R-US_" device="R0805" value="220"/>
 <part name="DC1" library="dc-dc-converter" deviceset="NMA" device="" value="MEV1S0505SC"/>
@@ -6567,13 +6637,14 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <part name="X2" library="con-hirschmann" deviceset="MAB5SH" device=""/>
 <part name="R5" library="resistor" deviceset="R-US_" device="R0805" value="220"/>
 <part name="R6" library="resistor" deviceset="R-US_" device="R0805" value="220"/>
-<part name="R7" library="resistor" deviceset="R-US_" device="R0805" value="10k"/>
+<part name="R7" library="resistor" deviceset="R-US_" device="R0805" value="1k"/>
 <part name="GND2" library="supply1" deviceset="GND" device=""/>
 <part name="P+3" library="supply1" deviceset="+5V" device=""/>
 <part name="R8" library="resistor" deviceset="R-US_" device="R0805" value="560"/>
 <part name="R9" library="resistor" deviceset="R-US_" device="R0805" value="1.5k"/>
 <part name="R10" library="resistor" deviceset="R-US_" device="R0805" value="1.5k"/>
 <part name="P+4" library="supply1" deviceset="+5V" device=""/>
+<part name="D1" library="diode" deviceset="SRP100" device=""/>
 </parts>
 <sheets>
 <sheet>
@@ -6585,16 +6656,15 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <instance part="P+1" gate="1" x="109.22" y="91.44"/>
 <instance part="U$1" gate="G$1" x="76.2" y="45.72"/>
 <instance part="R1" gate="G$1" x="104.14" y="60.96" rot="R90"/>
-<instance part="SV1" gate="1" x="10.16" y="68.58"/>
-<instance part="GND13" gate="1" x="20.32" y="55.88"/>
+<instance part="SV1" gate="1" x="10.16" y="63.5"/>
+<instance part="GND13" gate="1" x="20.32" y="50.8"/>
 <instance part="OK1" gate="G$1" x="175.26" y="104.14"/>
 <instance part="+3V1" gate="G$1" x="116.84" y="91.44"/>
 <instance part="P+2" gate="1" x="208.28" y="127"/>
 <instance part="GND1" gate="1" x="190.5" y="91.44"/>
 <instance part="C1" gate="G$1" x="208.28" y="101.6"/>
-<instance part="R2" gate="G$1" x="198.12" y="116.84" rot="R90"/>
+<instance part="R2" gate="G$1" x="203.2" y="114.3"/>
 <instance part="R3" gate="G$1" x="200.66" y="101.6" rot="R90"/>
-<instance part="+3V2" gate="G$1" x="198.12" y="127"/>
 <instance part="X1" gate="G$1" x="175.26" y="132.08"/>
 <instance part="R4" gate="G$1" x="182.88" y="116.84"/>
 <instance part="DC1" gate="G$1" x="175.26" y="33.02"/>
@@ -6609,6 +6679,7 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <instance part="R9" gate="G$1" x="22.86" y="17.78" rot="R90"/>
 <instance part="R10" gate="G$1" x="30.48" y="17.78" rot="R90"/>
 <instance part="P+4" gate="1" x="15.24" y="15.24"/>
+<instance part="D1" gate="1" x="160.02" y="104.14" rot="R90"/>
 </instances>
 <busses>
 </busses>
@@ -6626,8 +6697,8 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <segment>
 <pinref part="GND13" gate="1" pin="GND"/>
 <pinref part="SV1" gate="1" pin="1"/>
-<wire x1="17.78" y1="60.96" x2="20.32" y2="60.96" width="0.1524" layer="91"/>
-<wire x1="20.32" y1="60.96" x2="20.32" y2="58.42" width="0.1524" layer="91"/>
+<wire x1="17.78" y1="55.88" x2="20.32" y2="55.88" width="0.1524" layer="91"/>
+<wire x1="20.32" y1="55.88" x2="20.32" y2="53.34" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <pinref part="OK1" gate="G$1" pin="GND"/>
@@ -6657,19 +6728,24 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <wire x1="109.22" y1="73.66" x2="109.22" y2="83.82" width="0.1524" layer="91"/>
 <pinref part="SV1" gate="1" pin="2"/>
 <wire x1="109.22" y1="83.82" x2="109.22" y2="88.9" width="0.1524" layer="91"/>
-<wire x1="17.78" y1="63.5" x2="20.32" y2="63.5" width="0.1524" layer="91"/>
-<wire x1="20.32" y1="63.5" x2="20.32" y2="83.82" width="0.1524" layer="91"/>
+<wire x1="17.78" y1="58.42" x2="20.32" y2="58.42" width="0.1524" layer="91"/>
+<wire x1="20.32" y1="58.42" x2="20.32" y2="83.82" width="0.1524" layer="91"/>
 <wire x1="109.22" y1="83.82" x2="20.32" y2="83.82" width="0.1524" layer="91"/>
 <junction x="109.22" y="83.82"/>
 </segment>
 <segment>
-<pinref part="OK1" gate="G$1" pin="VCC"/>
 <pinref part="P+2" gate="1" pin="+5V"/>
-<wire x1="187.96" y1="109.22" x2="208.28" y2="109.22" width="0.1524" layer="91"/>
-<wire x1="208.28" y1="109.22" x2="208.28" y2="124.46" width="0.1524" layer="91"/>
 <pinref part="C1" gate="G$1" pin="1"/>
-<wire x1="208.28" y1="104.14" x2="208.28" y2="109.22" width="0.1524" layer="91"/>
-<junction x="208.28" y="109.22"/>
+<wire x1="208.28" y1="114.3" x2="208.28" y2="119.38" width="0.1524" layer="91"/>
+<wire x1="208.28" y1="119.38" x2="208.28" y2="124.46" width="0.1524" layer="91"/>
+<wire x1="208.28" y1="104.14" x2="208.28" y2="114.3" width="0.1524" layer="91"/>
+<pinref part="R2" gate="G$1" pin="2"/>
+<junction x="208.28" y="114.3"/>
+<pinref part="OK1" gate="G$1" pin="VCC"/>
+<wire x1="187.96" y1="109.22" x2="195.58" y2="109.22" width="0.1524" layer="91"/>
+<wire x1="195.58" y1="109.22" x2="195.58" y2="119.38" width="0.1524" layer="91"/>
+<wire x1="195.58" y1="119.38" x2="208.28" y2="119.38" width="0.1524" layer="91"/>
+<junction x="208.28" y="119.38"/>
 </segment>
 <segment>
 <pinref part="DC1" gate="G$1" pin="+VIN"/>
@@ -6705,11 +6781,11 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <segment>
 <pinref part="U$1" gate="G$1" pin="18/A4/T/SDA0"/>
 <wire x1="53.34" y1="27.94" x2="30.48" y2="27.94" width="0.1524" layer="91"/>
-<label x="38.1" y="27.94" size="1.778" layer="95"/>
+<label x="35.56" y="27.94" size="1.778" layer="95"/>
 <pinref part="SV1" gate="1" pin="4"/>
 <wire x1="30.48" y1="27.94" x2="25.4" y2="27.94" width="0.1524" layer="91"/>
-<wire x1="25.4" y1="27.94" x2="25.4" y2="68.58" width="0.1524" layer="91"/>
-<wire x1="25.4" y1="68.58" x2="17.78" y2="68.58" width="0.1524" layer="91"/>
+<wire x1="25.4" y1="27.94" x2="25.4" y2="63.5" width="0.1524" layer="91"/>
+<wire x1="25.4" y1="63.5" x2="17.78" y2="63.5" width="0.1524" layer="91"/>
 <pinref part="R10" gate="G$1" pin="2"/>
 <wire x1="30.48" y1="22.86" x2="30.48" y2="27.94" width="0.1524" layer="91"/>
 <junction x="30.48" y="27.94"/>
@@ -6719,10 +6795,10 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <segment>
 <pinref part="U$1" gate="G$1" pin="19/A5/T/SCL0"/>
 <wire x1="53.34" y1="25.4" x2="22.86" y2="25.4" width="0.1524" layer="91"/>
-<label x="38.1" y="25.4" size="1.778" layer="95"/>
+<label x="35.56" y="25.4" size="1.778" layer="95"/>
 <pinref part="SV1" gate="1" pin="3"/>
-<wire x1="22.86" y1="25.4" x2="22.86" y2="66.04" width="0.1524" layer="91"/>
-<wire x1="22.86" y1="66.04" x2="17.78" y2="66.04" width="0.1524" layer="91"/>
+<wire x1="22.86" y1="25.4" x2="22.86" y2="60.96" width="0.1524" layer="91"/>
+<wire x1="22.86" y1="60.96" x2="17.78" y2="60.96" width="0.1524" layer="91"/>
 <pinref part="R9" gate="G$1" pin="2"/>
 <wire x1="22.86" y1="22.86" x2="22.86" y2="25.4" width="0.1524" layer="91"/>
 <junction x="22.86" y="25.4"/>
@@ -6731,75 +6807,73 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <net name="PS_EN" class="0">
 <segment>
 <pinref part="SV1" gate="1" pin="6"/>
-<wire x1="17.78" y1="73.66" x2="27.94" y2="73.66" width="0.1524" layer="91"/>
-<label x="38.1" y="68.58" size="1.778" layer="95"/>
-<wire x1="27.94" y1="73.66" x2="27.94" y2="68.58" width="0.1524" layer="91"/>
+<label x="35.56" y="68.58" size="1.778" layer="95"/>
 <pinref part="U$1" gate="G$1" pin="2"/>
-<wire x1="27.94" y1="68.58" x2="53.34" y2="68.58" width="0.1524" layer="91"/>
+<wire x1="17.78" y1="68.58" x2="53.34" y2="68.58" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="ADDR_LATCH" class="0">
 <segment>
 <pinref part="SV1" gate="1" pin="5"/>
-<pinref part="U$1" gate="G$1" pin="1/TX1/T"/>
-<wire x1="17.78" y1="71.12" x2="53.34" y2="71.12" width="0.1524" layer="91"/>
-<label x="38.1" y="71.12" size="1.778" layer="95"/>
+<label x="35.56" y="66.04" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="3/CAN-TX/PWM"/>
+<wire x1="17.78" y1="66.04" x2="53.34" y2="66.04" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="LCD_RESET" class="0">
 <segment>
-<pinref part="U$1" gate="G$1" pin="7/RX3"/>
-<wire x1="53.34" y1="55.88" x2="38.1" y2="55.88" width="0.1524" layer="91"/>
-<label x="38.1" y="55.88" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="16/A2/T"/>
+<wire x1="53.34" y1="33.02" x2="35.56" y2="33.02" width="0.1524" layer="91"/>
+<label x="35.56" y="33.02" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="TOUCH_CS" class="0">
 <segment>
-<pinref part="U$1" gate="G$1" pin="8/TX3"/>
-<wire x1="53.34" y1="53.34" x2="38.1" y2="53.34" width="0.1524" layer="91"/>
-<label x="38.1" y="53.34" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="20/A6/PWM"/>
+<wire x1="53.34" y1="22.86" x2="35.56" y2="22.86" width="0.1524" layer="91"/>
+<label x="35.56" y="22.86" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="LCD_DC" class="0">
 <segment>
 <pinref part="U$1" gate="G$1" pin="9/RX2/PWM"/>
-<wire x1="53.34" y1="50.8" x2="38.1" y2="50.8" width="0.1524" layer="91"/>
-<label x="38.1" y="50.8" size="1.778" layer="95"/>
+<wire x1="53.34" y1="50.8" x2="35.56" y2="50.8" width="0.1524" layer="91"/>
+<label x="35.56" y="50.8" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="LCD_CS" class="0">
 <segment>
 <pinref part="U$1" gate="G$1" pin="10/TX2/PWM"/>
-<wire x1="53.34" y1="48.26" x2="38.1" y2="48.26" width="0.1524" layer="91"/>
-<label x="38.1" y="48.26" size="1.778" layer="95"/>
+<wire x1="53.34" y1="48.26" x2="35.56" y2="48.26" width="0.1524" layer="91"/>
+<label x="35.56" y="48.26" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="SPI_MOSI" class="0">
 <segment>
 <pinref part="U$1" gate="G$1" pin="11/MOSI"/>
-<wire x1="53.34" y1="45.72" x2="38.1" y2="45.72" width="0.1524" layer="91"/>
-<label x="38.1" y="45.72" size="1.778" layer="95"/>
+<wire x1="53.34" y1="45.72" x2="35.56" y2="45.72" width="0.1524" layer="91"/>
+<label x="35.56" y="45.72" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="SPI_MISO" class="0">
 <segment>
 <pinref part="U$1" gate="G$1" pin="12/MISO"/>
-<wire x1="53.34" y1="43.18" x2="38.1" y2="43.18" width="0.1524" layer="91"/>
-<label x="38.1" y="43.18" size="1.778" layer="95"/>
+<wire x1="53.34" y1="43.18" x2="35.56" y2="43.18" width="0.1524" layer="91"/>
+<label x="35.56" y="43.18" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="SPI_SCK" class="0">
 <segment>
 <pinref part="U$1" gate="G$1" pin="14/A0"/>
-<wire x1="53.34" y1="38.1" x2="38.1" y2="38.1" width="0.1524" layer="91"/>
-<label x="38.1" y="38.1" size="1.778" layer="95"/>
+<wire x1="53.34" y1="38.1" x2="35.56" y2="38.1" width="0.1524" layer="91"/>
+<label x="35.56" y="38.1" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="SD_CARD_CS" class="0">
 <segment>
 <pinref part="U$1" gate="G$1" pin="15/A1/T"/>
-<wire x1="53.34" y1="35.56" x2="38.1" y2="35.56" width="0.1524" layer="91"/>
-<label x="38.1" y="35.56" size="1.778" layer="95"/>
+<wire x1="53.34" y1="35.56" x2="35.56" y2="35.56" width="0.1524" layer="91"/>
+<label x="35.56" y="35.56" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="+3V3" class="0">
@@ -6809,11 +6883,6 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <wire x1="99.06" y1="71.12" x2="116.84" y2="71.12" width="0.1524" layer="91"/>
 <wire x1="116.84" y1="71.12" x2="116.84" y2="88.9" width="0.1524" layer="91"/>
 </segment>
-<segment>
-<pinref part="+3V2" gate="G$1" pin="+3V3"/>
-<pinref part="R2" gate="G$1" pin="2"/>
-<wire x1="198.12" y1="124.46" x2="198.12" y2="121.92" width="0.1524" layer="91"/>
-</segment>
 </net>
 <net name="MIDI_IN" class="0">
 <segment>
@@ -6821,7 +6890,12 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <wire x1="187.96" y1="104.14" x2="198.12" y2="104.14" width="0.1524" layer="91"/>
 <label x="187.96" y="104.14" size="1.778" layer="95"/>
 <pinref part="R2" gate="G$1" pin="1"/>
-<wire x1="198.12" y1="111.76" x2="198.12" y2="104.14" width="0.1524" layer="91"/>
+<wire x1="198.12" y1="114.3" x2="198.12" y2="104.14" width="0.1524" layer="91"/>
+</segment>
+<segment>
+<pinref part="U$1" gate="G$1" pin="0/RX1/T"/>
+<wire x1="53.34" y1="73.66" x2="35.56" y2="73.66" width="0.1524" layer="91"/>
+<label x="35.56" y="73.66" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="N$2" class="0">
@@ -6837,7 +6911,11 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <wire x1="162.56" y1="129.54" x2="157.48" y2="129.54" width="0.1524" layer="91"/>
 <wire x1="157.48" y1="129.54" x2="157.48" y2="99.06" width="0.1524" layer="91"/>
 <pinref part="OK1" gate="G$1" pin="C"/>
-<wire x1="157.48" y1="99.06" x2="162.56" y2="99.06" width="0.1524" layer="91"/>
+<wire x1="157.48" y1="99.06" x2="160.02" y2="99.06" width="0.1524" layer="91"/>
+<pinref part="D1" gate="1" pin="A"/>
+<wire x1="160.02" y1="99.06" x2="162.56" y2="99.06" width="0.1524" layer="91"/>
+<wire x1="160.02" y1="101.6" x2="160.02" y2="99.06" width="0.1524" layer="91"/>
+<junction x="160.02" y="99.06"/>
 </segment>
 </net>
 <net name="N$7" class="0">
@@ -6916,6 +6994,11 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <wire x1="162.56" y1="2.54" x2="149.86" y2="2.54" width="0.1524" layer="91"/>
 <label x="149.86" y="2.54" size="1.778" layer="95"/>
 </segment>
+<segment>
+<pinref part="U$1" gate="G$1" pin="1/TX1/T"/>
+<wire x1="53.34" y1="71.12" x2="35.56" y2="71.12" width="0.1524" layer="91"/>
+<label x="35.56" y="71.12" size="1.778" layer="95"/>
+</segment>
 </net>
 <net name="N$4" class="0">
 <segment>
@@ -6933,6 +7016,16 @@ Audio, scart, microphone, headphone&lt;p&gt;
 <wire x1="160.02" y1="109.22" x2="160.02" y2="116.84" width="0.1524" layer="91"/>
 <pinref part="R4" gate="G$1" pin="1"/>
 <wire x1="160.02" y1="116.84" x2="177.8" y2="116.84" width="0.1524" layer="91"/>
+<pinref part="D1" gate="1" pin="C"/>
+<wire x1="160.02" y1="106.68" x2="160.02" y2="109.22" width="0.1524" layer="91"/>
+<junction x="160.02" y="109.22"/>
+</segment>
+</net>
+<net name="LCD_BACKLIGHT" class="0">
+<segment>
+<label x="35.56" y="63.5" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="4/CAN-RX-PWM"/>
+<wire x1="53.34" y1="63.5" x2="35.56" y2="63.5" width="0.1524" layer="91"/>
 </segment>
 </net>
 </nets>

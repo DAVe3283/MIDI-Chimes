@@ -20,7 +20,7 @@
 // * Physical MIDI support
 //   * When a note doesn't match the current channel, pass it to MIDI out
 //   * Software MIDI "thru" support (pass all inputs to the output when thru is on)
-//   * Or do we want hardware MIDI THRU, which is just a transistor?
+//     * This will be complex to handle the system common message, which is variable length
 // * Implement I2C timeout (properly) & handle I2C errors
 //   * Probably need a very short timeout (1ms or less) to avoid messing up song
 //     * Or should we just throw a giant error and abort playback?
@@ -134,12 +134,12 @@ const uint8_t sd_cs_pin(15);
 
 // Touch Screen
 // Pins
-const uint8_t lcd_reset_pin(7);
+const uint8_t lcd_reset_pin(16);
 const uint8_t lcd_cs_pin(10);
 const uint8_t lcd_dc_pin(9);
-const uint8_t touch_cs_pin(8);
+const uint8_t touch_cs_pin(20);
 // Backlight
-const uint8_t lcd_backlight_pin(3);
+const uint8_t lcd_backlight_pin(4);
 const uint8_t lcd_bl_pwm_bits(16);
 const uint32_t lcd_bl_pwm_freq(549); // Hz
 // Calibration
@@ -178,6 +178,16 @@ const int16_t button_vol_u_x(265);
 const int16_t button_vol_u_y(185);
 const int16_t button_vol_w(50);
 const int16_t button_vol_h(50);
+
+// MIDI Commands
+const uint8_t midi_cmd_note_off(0x80);
+const uint8_t midi_cmd_note_on(0x90);
+const uint8_t midi_cmd_aftertouch(0xA0);
+const uint8_t midi_cmd_control_change(0xB0);
+const uint8_t midi_cmd_program_change(0xC0);
+const uint8_t midi_cmd_aftertouch_mono(0xD0);
+const uint8_t midi_cmd_pitch_bend(0xE0);
+const uint8_t midi_cmd_system_exclusive(0xF0);
 
 
 // -----------------------------------------------------------------------------
@@ -239,9 +249,8 @@ int16_t fb_selected_line(0); // Which line in the file browse list is currently 
 elapsedMicros message_blink_timer;
 
 // Serial IO
-// usb_serial_class  usb = usb_serial_class();
-HardwareSerial    ser = HardwareSerial();
-// TODO: hardware MIDI
+HardwareSerial midi = HardwareSerial();
+HardwareSerial3 ser = HardwareSerial3(); // For debug
 
 // SD Card
 SdFat sd;
@@ -258,6 +267,7 @@ ILI9341_t3 tft = ILI9341_t3(lcd_cs_pin, lcd_dc_pin, lcd_reset_pin, spi_mosi_pin,
 
 // µGUI
 UG_GUI gui;
+
 // Main Window
 UG_WINDOW main_window;
 UG_BUTTON main_window_button_settings;
@@ -445,6 +455,9 @@ void setup()
   // usbMIDI.setHandleNoteOff(OnNoteOff); // Not needed
   // TODO: handle more MIDI stuff?
 
+  // Configure hardware MIDI
+  midi.begin(31250, SERIAL_8N1);
+
   // Draw Main Window
   draw_main_window();
 
@@ -463,6 +476,97 @@ void loop()
 {
   // Handle USB MIDI messages
   usbMIDI.read();
+
+  // Handle hardware MIDI messages
+  int midi_bytes_available;
+  while ((midi_bytes_available = midi.available()) > 0)
+  {
+    const uint8_t status(midi.peek());
+
+    // Drop non-command data until the buffer starts with a command
+    if (status < 0x80) // All command bytes start with a 1
+    {
+      midi.read(); // Drop the byte from the buffer
+      continue;
+    }
+
+    // Parse
+    const uint8_t command(status & 0xF0); // Mask off channel
+    const uint8_t channel(status & 0x0F); // Mask off command
+
+    // Find how many data bytes we need
+    int required_data_bytes(0);
+    switch (command)
+    {
+    // 2 byte commands
+    case midi_cmd_note_off:
+    case midi_cmd_note_on:
+    case midi_cmd_aftertouch:
+    case midi_cmd_control_change:
+    case midi_cmd_pitch_bend:
+      required_data_bytes = 2;
+      break;
+
+    // 1 byte commands
+    case midi_cmd_program_change:
+    case midi_cmd_aftertouch_mono:
+      required_data_bytes = 1;
+      break;
+
+    // Unknown commands
+    default:
+      break;
+    }
+
+    // Verify we have enough data
+    if (midi_bytes_available <= required_data_bytes)
+    {
+      break;
+    }
+
+    // Read command & data
+    midi.read(); // Drop command from buffer, we already know what it is
+    uint8_t midi_buffer[required_data_bytes];
+    bool valid(true);
+    for (int i(0); i < required_data_bytes; ++i)
+    {
+      // Validate byte is not a command (data values all start with 0)
+      if (midi.peek() >= 0x80)
+      {
+        // We didn't get the correct number of data bytes! Drop what we have so
+        // far and start again on the next command
+        valid = false;
+        break;
+      }
+
+      // Read the data byte
+      midi_buffer[i] = midi.read();
+    }
+    if (valid)
+    {
+      // Call appropriate function
+      switch (command)
+      {
+      // Note On
+      case midi_cmd_note_on:
+        OnNoteOn(channel, midi_buffer[0], midi_buffer[1]);
+        break;
+
+      // Not implemented
+      case midi_cmd_note_off:
+      case midi_cmd_aftertouch:
+      case midi_cmd_control_change:
+      case midi_cmd_program_change:
+      case midi_cmd_aftertouch_mono:
+      case midi_cmd_pitch_bend:
+        break;
+
+      // Unknown commands
+      default:
+        break;
+      }
+    }
+  }
 
   // Handle GUI & Touch
   const bool touched(ts.touched());
