@@ -7161,29 +7161,26 @@ diameter 2.54 mm, horizontal, grid 10.16 mm</description>
 </deviceset>
 </devicesets>
 </library>
-<library name="maxim">
-<description>&lt;b&gt;Maxim Components&lt;/b&gt;&lt;p&gt;
-
-&lt;author&gt;Created by librarian@cadsoft.de&lt;/author&gt;</description>
+<library name="DAVe3283">
 <packages>
-<package name="UMAX8">
-<description>&lt;b&gt;micro MAX Package&lt;/b&gt;</description>
-<wire x1="-1.4" y1="1.4" x2="1.4" y2="1.4" width="0.2032" layer="21"/>
-<wire x1="1.4" y1="1.4" x2="1.4" y2="-1.4" width="0.2032" layer="21"/>
-<wire x1="1.4" y1="-1.4" x2="-1.4" y2="-1.4" width="0.2032" layer="21"/>
-<wire x1="-1.4" y1="-1.4" x2="-1.4" y2="1.4" width="0.2032" layer="21"/>
-<wire x1="-0.7" y1="-1.1" x2="-0.7" y2="-0.4" width="0.2032" layer="21" curve="-180"/>
-<wire x1="-0.7" y1="-0.4" x2="-0.7" y2="-1.1" width="0.2032" layer="21"/>
-<smd name="1" x="-0.975" y="-2.175" dx="0.45" dy="1.2" layer="1"/>
-<smd name="2" x="-0.325" y="-2.175" dx="0.45" dy="1.2" layer="1"/>
-<smd name="3" x="0.325" y="-2.175" dx="0.45" dy="1.2" layer="1"/>
-<smd name="4" x="0.975" y="-2.175" dx="0.45" dy="1.2" layer="1"/>
-<smd name="5" x="0.975" y="2.175" dx="0.45" dy="1.2" layer="1"/>
-<smd name="6" x="0.325" y="2.175" dx="0.45" dy="1.2" layer="1"/>
-<smd name="7" x="-0.325" y="2.175" dx="0.45" dy="1.2" layer="1"/>
-<smd name="8" x="-0.975" y="2.175" dx="0.45" dy="1.2" layer="1"/>
-<text x="-1.636" y="-2.286" size="1.27" layer="25" rot="R90">&gt;NAME</text>
-<text x="2.906" y="-2.286" size="1.27" layer="27" rot="R90">&gt;VALUE</text>
+<package name="UMAX-U8-1">
+<description>MAXIM 8 uMAX U8-1</description>
+<wire x1="-1.5" y1="1.3" x2="1.5" y2="1.3" width="0.2032" layer="21"/>
+<wire x1="1.5" y1="1.3" x2="1.5" y2="-1.3" width="0.2032" layer="21"/>
+<wire x1="1.5" y1="-1.3" x2="-1.5" y2="-1.3" width="0.2032" layer="21"/>
+<wire x1="-1.5" y1="-1.3" x2="-1.5" y2="1.3" width="0.2032" layer="21"/>
+<wire x1="-0.8" y1="-1" x2="-0.8" y2="-0.3" width="0.2032" layer="21" curve="-180"/>
+<wire x1="-0.8" y1="-0.3" x2="-0.8" y2="-1" width="0.2032" layer="21"/>
+<smd name="1" x="-0.975" y="-2.15" dx="0.45" dy="1.35" layer="1"/>
+<smd name="2" x="-0.325" y="-2.15" dx="0.45" dy="1.35" layer="1"/>
+<smd name="3" x="0.325" y="-2.15" dx="0.45" dy="1.35" layer="1"/>
+<smd name="4" x="0.975" y="-2.15" dx="0.45" dy="1.35" layer="1"/>
+<smd name="5" x="0.975" y="2.15" dx="0.45" dy="1.35" layer="1"/>
+<smd name="6" x="0.325" y="2.15" dx="0.45" dy="1.35" layer="1"/>
+<smd name="7" x="-0.325" y="2.15" dx="0.45" dy="1.35" layer="1"/>
+<smd name="8" x="-0.975" y="2.15" dx="0.45" dy="1.35" layer="1"/>
+<text x="-1.905" y="-2.54" size="1.27" layer="25" rot="R90">&gt;NAME</text>
+<text x="3.175" y="-2.54" size="1.27" layer="27" rot="R90">&gt;VALUE</text>
 <rectangle x1="-1.1528" y1="-2.4036" x2="-0.7972" y2="-1.4384" layer="51"/>
 <rectangle x1="-0.5028" y1="-2.4036" x2="-0.1472" y2="-1.4384" layer="51"/>
 <rectangle x1="0.1472" y1="-2.4036" x2="0.5028" y2="-1.4384" layer="51"/>
@@ -7195,53 +7192,40 @@ diameter 2.54 mm, horizontal, grid 10.16 mm</description>
 </package>
 </packages>
 <symbols>
-<symbol name="MAX705">
-<wire x1="10.16" y1="-10.16" x2="-7.62" y2="-10.16" width="0.4064" layer="94"/>
-<wire x1="-7.62" y1="10.16" x2="-7.62" y2="-10.16" width="0.4064" layer="94"/>
-<wire x1="-7.62" y1="10.16" x2="10.16" y2="10.16" width="0.4064" layer="94"/>
-<wire x1="10.16" y1="-10.16" x2="10.16" y2="10.16" width="0.4064" layer="94"/>
-<wire x1="-5.207" y1="-3.937" x2="-2.667" y2="-3.937" width="0.1524" layer="95"/>
-<wire x1="3.683" y1="6.223" x2="7.493" y2="6.223" width="0.1524" layer="95"/>
-<wire x1="1.143" y1="-3.937" x2="7.493" y2="-3.937" width="0.1524" layer="95"/>
-<wire x1="3.683" y1="1.143" x2="7.493" y2="1.143" width="0.1524" layer="95"/>
-<text x="-7.62" y="10.795" size="1.778" layer="95">&gt;NAME</text>
-<text x="-7.62" y="-12.7" size="1.778" layer="96">&gt;VALUE</text>
-<text x="2.54" y="7.62" size="1.778" layer="95">VCC</text>
-<text x="2.54" y="-9.525" size="1.778" layer="95">GND</text>
-<pin name="PFO" x="12.7" y="5.08" length="short" direction="out" rot="R180"/>
-<pin name="PFI" x="-10.16" y="5.08" length="short" direction="in"/>
-<pin name="MR" x="-10.16" y="-5.08" length="short" direction="in"/>
-<pin name="WDO" x="12.7" y="0" length="short" direction="out" rot="R180"/>
-<pin name="GND" x="5.08" y="-12.7" visible="pad" length="short" direction="pwr" rot="R90"/>
-<pin name="VCC" x="5.08" y="12.7" visible="pad" length="short" direction="pwr" rot="R270"/>
-<pin name="WDI" x="-10.16" y="0" length="short" direction="in"/>
-<pin name="RESET" x="12.7" y="-5.08" length="short" direction="out" rot="R180"/>
+<symbol name="MAX16997">
+<wire x1="-10.16" y1="5.08" x2="10.16" y2="5.08" width="0.254" layer="94"/>
+<wire x1="10.16" y1="5.08" x2="10.16" y2="-5.08" width="0.254" layer="94"/>
+<wire x1="10.16" y1="-5.08" x2="-10.16" y2="-5.08" width="0.254" layer="94"/>
+<wire x1="-10.16" y1="-5.08" x2="-10.16" y2="5.08" width="0.254" layer="94"/>
+<pin name="IN" x="-15.24" y="2.54" length="middle" direction="pwr"/>
+<pin name="EN" x="-15.24" y="0" length="middle" direction="in"/>
+<pin name="SWT" x="-15.24" y="-2.54" length="middle"/>
+<pin name="GND" x="15.24" y="-2.54" length="middle" direction="pwr" rot="R180"/>
+<pin name="WDI" x="15.24" y="0" length="middle" direction="in" rot="R180"/>
+<pin name="!ENABLE" x="15.24" y="2.54" length="middle" direction="out" rot="R180"/>
+<text x="-10.16" y="5.715" size="1.778" layer="95">&gt;NAME</text>
+<text x="-10.16" y="-7.62" size="1.778" layer="96">&gt;VALUE</text>
 </symbol>
 </symbols>
 <devicesets>
-<deviceset name="MAX705CUA" prefix="IC">
-<description>&lt;b&gt;WATCHDOG&lt;/b&gt;</description>
+<deviceset name="MAX16997">
+<description>MAXIM MAX16997 Watchdog</description>
 <gates>
-<gate name="G$1" symbol="MAX705" x="0" y="0"/>
+<gate name="G$1" symbol="MAX16997" x="0" y="0"/>
 </gates>
 <devices>
-<device name="" package="UMAX8">
+<device name="" package="UMAX-U8-1">
 <connects>
-<connect gate="G$1" pin="GND" pad="3"/>
-<connect gate="G$1" pin="MR" pad="1"/>
-<connect gate="G$1" pin="PFI" pad="4"/>
-<connect gate="G$1" pin="PFO" pad="5"/>
-<connect gate="G$1" pin="RESET" pad="7"/>
-<connect gate="G$1" pin="VCC" pad="2"/>
+<connect gate="G$1" pin="!ENABLE" pad="8"/>
+<connect gate="G$1" pin="EN" pad="2"/>
+<connect gate="G$1" pin="GND" pad="5"/>
+<connect gate="G$1" pin="IN" pad="1"/>
+<connect gate="G$1" pin="SWT" pad="4"/>
 <connect gate="G$1" pin="WDI" pad="6"/>
-<connect gate="G$1" pin="WDO" pad="8"/>
 </connects>
 <technologies>
 <technology name="">
-<attribute name="MF" value="" constant="no"/>
-<attribute name="MPN" value="MAX705CUA+" constant="no"/>
-<attribute name="OC_FARNELL" value="unknown" constant="no"/>
-<attribute name="OC_NEWARK" value="13M2396" constant="no"/>
+<attribute name="MPN" value="MAX16997A"/>
 </technology>
 </technologies>
 </device>
@@ -7295,19 +7279,16 @@ diameter 2.54 mm, horizontal, grid 10.16 mm</description>
 <part name="VCC1" library="supply1" deviceset="VCCINT" device=""/>
 <part name="GND5" library="supply1" deviceset="GNDINT" device=""/>
 <part name="SV2" library="con-lstb" deviceset="MA06-1" device="" value="Power Supply"/>
-<part name="GND6" library="supply1" deviceset="GND" device=""/>
 <part name="P+4" library="supply1" deviceset="+5V" device=""/>
-<part name="IC1" library="maxim" deviceset="MAX705CUA" device=""/>
 <part name="P+7" library="supply1" deviceset="+5V" device=""/>
 <part name="C2" library="resistor" deviceset="C-US" device="C0805" value="0.1u"/>
 <part name="GND7" library="supply1" deviceset="GND" device=""/>
 <part name="C3" library="resistor" deviceset="C-US" device="C0805" value="10n"/>
+<part name="U$2" library="DAVe3283" deviceset="MAX16997" device=""/>
 </parts>
 <sheets>
 <sheet>
 <plain>
-<text x="0" y="139.7" size="1.778" layer="97">This is not the right schematic symbol for the watchdog,
-but it is the right footprint, so ignore the errors.</text>
 </plain>
 <instances>
 <instance part="AGND1" gate="VR1" x="76.2" y="40.64"/>
@@ -7346,13 +7327,12 @@ but it is the right footprint, so ignore the errors.</text>
 <instance part="VCC1" gate="G$1" x="149.86" y="99.06"/>
 <instance part="GND5" gate="G$1" x="147.32" y="35.56"/>
 <instance part="SV2" gate="1" x="71.12" y="121.92"/>
-<instance part="GND6" gate="1" x="86.36" y="114.3"/>
 <instance part="P+4" gate="1" x="81.28" y="137.16"/>
-<instance part="IC1" gate="G$1" x="50.8" y="106.68"/>
-<instance part="P+7" gate="1" x="5.08" y="127"/>
-<instance part="C2" gate="G$1" x="5.08" y="96.52"/>
-<instance part="GND7" gate="1" x="5.08" y="83.82"/>
-<instance part="C3" gate="G$1" x="15.24" y="96.52"/>
+<instance part="P+7" gate="1" x="27.94" y="127"/>
+<instance part="C2" gate="G$1" x="27.94" y="96.52"/>
+<instance part="GND7" gate="1" x="86.36" y="83.82"/>
+<instance part="C3" gate="G$1" x="38.1" y="96.52"/>
+<instance part="U$2" gate="G$1" x="55.88" y="104.14"/>
 </instances>
 <busses>
 </busses>
@@ -7403,28 +7383,27 @@ but it is the right footprint, so ignore the errors.</text>
 <wire x1="96.52" y1="10.16" x2="99.06" y2="10.16" width="0.1524" layer="91"/>
 </segment>
 <segment>
-<pinref part="GND6" gate="1" pin="GND"/>
+<pinref part="C2" gate="G$1" pin="2"/>
+<wire x1="38.1" y1="88.9" x2="27.94" y2="88.9" width="0.1524" layer="91"/>
+<wire x1="27.94" y1="88.9" x2="27.94" y2="91.44" width="0.1524" layer="91"/>
+<pinref part="C3" gate="G$1" pin="2"/>
+<wire x1="38.1" y1="91.44" x2="38.1" y2="88.9" width="0.1524" layer="91"/>
 <pinref part="SV2" gate="1" pin="2"/>
 <wire x1="86.36" y1="116.84" x2="78.74" y2="116.84" width="0.1524" layer="91"/>
-<junction x="86.36" y="116.84"/>
 <pinref part="SV2" gate="1" pin="4"/>
 <wire x1="78.74" y1="121.92" x2="86.36" y2="121.92" width="0.1524" layer="91"/>
 <wire x1="86.36" y1="121.92" x2="86.36" y2="116.84" width="0.1524" layer="91"/>
-</segment>
-<segment>
-<pinref part="IC1" gate="G$1" pin="PFO"/>
-<wire x1="63.5" y1="111.76" x2="66.04" y2="111.76" width="0.1524" layer="91"/>
-<wire x1="66.04" y1="111.76" x2="66.04" y2="88.9" width="0.1524" layer="91"/>
-<pinref part="C2" gate="G$1" pin="2"/>
-<wire x1="66.04" y1="88.9" x2="15.24" y2="88.9" width="0.1524" layer="91"/>
-<wire x1="15.24" y1="88.9" x2="5.08" y2="88.9" width="0.1524" layer="91"/>
-<wire x1="5.08" y1="88.9" x2="5.08" y2="91.44" width="0.1524" layer="91"/>
-<wire x1="5.08" y1="86.36" x2="5.08" y2="88.9" width="0.1524" layer="91"/>
-<junction x="5.08" y="88.9"/>
+<pinref part="U$2" gate="G$1" pin="GND"/>
+<wire x1="71.12" y1="101.6" x2="86.36" y2="101.6" width="0.1524" layer="91"/>
+<wire x1="86.36" y1="101.6" x2="86.36" y2="116.84" width="0.1524" layer="91"/>
+<junction x="86.36" y="116.84"/>
+<wire x1="38.1" y1="88.9" x2="86.36" y2="88.9" width="0.1524" layer="91"/>
+<wire x1="86.36" y1="88.9" x2="86.36" y2="101.6" width="0.1524" layer="91"/>
+<junction x="38.1" y="88.9"/>
+<junction x="86.36" y="101.6"/>
 <pinref part="GND7" gate="1" pin="GND"/>
-<pinref part="C3" gate="G$1" pin="2"/>
-<wire x1="15.24" y1="91.44" x2="15.24" y2="88.9" width="0.1524" layer="91"/>
-<junction x="15.24" y="88.9"/>
+<wire x1="86.36" y1="86.36" x2="86.36" y2="88.9" width="0.1524" layer="91"/>
+<junction x="86.36" y="88.9"/>
 </segment>
 </net>
 <net name="+5V" class="0">
@@ -7488,16 +7467,16 @@ but it is the right footprint, so ignore the errors.</text>
 <segment>
 <pinref part="P+7" gate="1" pin="+5V"/>
 <pinref part="C2" gate="G$1" pin="1"/>
-<wire x1="5.08" y1="124.46" x2="5.08" y2="121.92" width="0.1524" layer="91"/>
-<pinref part="IC1" gate="G$1" pin="MR"/>
-<wire x1="5.08" y1="121.92" x2="5.08" y2="101.6" width="0.1524" layer="91"/>
-<wire x1="5.08" y1="101.6" x2="5.08" y2="99.06" width="0.1524" layer="91"/>
-<wire x1="40.64" y1="101.6" x2="5.08" y2="101.6" width="0.1524" layer="91"/>
-<junction x="5.08" y="101.6"/>
-<pinref part="IC1" gate="G$1" pin="VCC"/>
-<wire x1="55.88" y1="119.38" x2="55.88" y2="121.92" width="0.1524" layer="91"/>
-<wire x1="55.88" y1="121.92" x2="5.08" y2="121.92" width="0.1524" layer="91"/>
-<junction x="5.08" y="121.92"/>
+<wire x1="27.94" y1="124.46" x2="27.94" y2="106.68" width="0.1524" layer="91"/>
+<pinref part="U$2" gate="G$1" pin="IN"/>
+<wire x1="27.94" y1="106.68" x2="27.94" y2="99.06" width="0.1524" layer="91"/>
+<wire x1="40.64" y1="106.68" x2="38.1" y2="106.68" width="0.1524" layer="91"/>
+<junction x="27.94" y="106.68"/>
+<pinref part="U$2" gate="G$1" pin="EN"/>
+<wire x1="38.1" y1="106.68" x2="27.94" y2="106.68" width="0.1524" layer="91"/>
+<wire x1="40.64" y1="104.14" x2="38.1" y2="104.14" width="0.1524" layer="91"/>
+<wire x1="38.1" y1="104.14" x2="38.1" y2="106.68" width="0.1524" layer="91"/>
+<junction x="38.1" y="106.68"/>
 </segment>
 </net>
 <net name="AGND" class="0">
@@ -7543,9 +7522,9 @@ but it is the right footprint, so ignore the errors.</text>
 <label x="81.28" y="22.86" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="IC1" gate="G$1" pin="WDI"/>
-<wire x1="40.64" y1="106.68" x2="22.86" y2="106.68" width="0.1524" layer="91"/>
-<label x="22.86" y="106.68" size="1.778" layer="95"/>
+<wire x1="81.28" y1="104.14" x2="71.12" y2="104.14" width="0.1524" layer="91"/>
+<label x="71.12" y="104.14" size="1.778" layer="95"/>
+<pinref part="U$2" gate="G$1" pin="WDI"/>
 </segment>
 <segment>
 <pinref part="U$1" gate="G$1" pin="9/RX2/PWM"/>
@@ -7853,21 +7832,21 @@ but it is the right footprint, so ignore the errors.</text>
 <junction x="149.86" y="93.98"/>
 </segment>
 </net>
-<net name="N$15" class="0">
-<segment>
-<pinref part="C3" gate="G$1" pin="1"/>
-<wire x1="15.24" y1="99.06" x2="15.24" y2="111.76" width="0.1524" layer="91"/>
-<pinref part="IC1" gate="G$1" pin="PFI"/>
-<wire x1="15.24" y1="111.76" x2="40.64" y2="111.76" width="0.1524" layer="91"/>
-</segment>
-</net>
 <net name="N$11" class="0">
 <segment>
-<pinref part="IC1" gate="G$1" pin="WDO"/>
-<wire x1="63.5" y1="106.68" x2="81.28" y2="106.68" width="0.1524" layer="91"/>
 <wire x1="81.28" y1="106.68" x2="81.28" y2="114.3" width="0.1524" layer="91"/>
 <pinref part="SV2" gate="1" pin="1"/>
 <wire x1="81.28" y1="114.3" x2="78.74" y2="114.3" width="0.1524" layer="91"/>
+<pinref part="U$2" gate="G$1" pin="!ENABLE"/>
+<wire x1="71.12" y1="106.68" x2="81.28" y2="106.68" width="0.1524" layer="91"/>
+</segment>
+</net>
+<net name="N$8" class="0">
+<segment>
+<pinref part="U$2" gate="G$1" pin="SWT"/>
+<pinref part="C3" gate="G$1" pin="1"/>
+<wire x1="40.64" y1="101.6" x2="38.1" y2="101.6" width="0.1524" layer="91"/>
+<wire x1="38.1" y1="101.6" x2="38.1" y2="99.06" width="0.1524" layer="91"/>
 </segment>
 </net>
 </nets>
@@ -7884,21 +7863,8 @@ but it is the right footprint, so ignore the errors.</text>
 <approved hash="204,1,198.12,40.64,M1,VIN,,,,"/>
 <approved hash="104,1,198.12,48.26,M1,5V,+5V,,,"/>
 <approved hash="104,1,198.12,50.8,M1,3V,+3V3,,,"/>
-<approved hash="208,1,76.2,55.88,GND,sup,,,,"/>
-<approved hash="208,1,139.7,132.08,GND,sup,,,,"/>
-<approved hash="208,1,109.22,66.04,GND,sup,,,,"/>
-<approved hash="208,1,195.58,40.64,GND,sup,,,,"/>
-<approved hash="208,1,96.52,7.62,GND,sup,,,,"/>
-<approved hash="208,1,86.36,116.84,GND,sup,,,,"/>
-<approved hash="208,1,63.5,111.76,GND,out,,,,"/>
-<approved hash="208,1,5.08,86.36,GND,sup,,,,"/>
+<approved hash="104,1,40.64,106.68,U$2,IN,+5V,,,"/>
 </errors>
 </schematic>
 </drawing>
-<compatibility>
-<note version="6.3" minversion="6.2.2" severity="warning">
-Since Version 6.2.2 text objects can contain more than one line,
-which will not be processed correctly with this version.
-</note>
-</compatibility>
 </eagle>
