@@ -1,5 +1,7 @@
 # Data Connector Pinout
 
+This is the connector between the master and slave devices.
+
 | Pin |  Description  |
 | --- | ------------- |
 |   1 | Ground        |
@@ -24,7 +26,41 @@ read a transistor voltage of 0 to 20.4 volts. The capacitor filters out the PWM
 frequency, letting me be extremely lazy with my firmware when checking how
 things are working.
 
+
 # Master
+
+## Power Supply Connector
+
+This is the pinout of the connector on the high voltage power supply.
+
+Note how the power supply datasheet counts terminal numbers! It might not be
+what you expect. For consistency, I use the same numbering as the datasheet.
+
+| Pin | Description |
+|-----|-------------|
+|   1 | RC+         |
+|   2 | RC-         |
+|   3 | AUX (5V_SB) |
+|   4 | AUX_GND     |
+|   5 | +S          |
+|   6 | -S          |
+
+### RC
+
+The RC+ and RC- pins are for Remote Control of the power supply. Shorting RC+ to
+RC- will turn off the power supply. It also appears that RC- is internally tied
+to AUX_GND, but I probably should explicitly do that on the PCB to be safe.
+
+### AUX
+
+This is a 5V standby power supply, limited to 300 mA. I think we come in under
+that, but it bears testing. If not, I might have to get creative...
+
+### +/-S
+
+This is a sense line to compensate for voltage droop at the load. We don't care,
+so these should be left unconnected. Probably best not to put wires in the
+header, so stray EMI doesn't get picked up.
 
 ## I2C Bus
 
