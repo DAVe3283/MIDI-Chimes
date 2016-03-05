@@ -58,6 +58,7 @@
 // Includes
 // -----------------------------------------------------------------------------
 
+
 // Core I/O (display, slaves, SD card)
 #include <SPI.h>
 #include <i2c_t3.h>
@@ -89,6 +90,8 @@ extern "C"
 
 // Blue Screen of Death :P
 #include "bsod_win10.h"
+
+#include "./QueueList.h"
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -182,7 +185,6 @@ const int16_t button_vol_u_x(265);
 const int16_t button_vol_u_y(185);
 const int16_t button_vol_w(50);
 const int16_t button_vol_h(50);
-
 
 // -----------------------------------------------------------------------------
 // Declarations
@@ -289,6 +291,15 @@ UG_OBJECT fb_window_buffer[(2*FB_LIST_SIZE)+6];
 char selected_path_buffer[MAX_PATH] = "/";
 char file_list_buffer[FB_LIST_SIZE][MAX_NAME] = { 0 };
 const char* file_icon[FB_LIST_SIZE];
+
+// Struct used for tracking file info
+struct file_info
+{
+  char name[MAX_NAME];
+  bool hidden;
+  bool directory;
+};
+typedef struct file_info FileInfo;
 
 // Settings Window
 UG_WINDOW settings_window;
@@ -799,7 +810,9 @@ void draw_fb_window()
   UG_ButtonSetText(&fb_window, BTN_ID_3, ">");
 
   // Get the file list from the SD card
+  UG_ConsolePutString("Updating file list...");
   update_file_list();
+  UG_ConsolePutString("done\n");
 
   const uint16_t line_height = 16;  // Height of a single line in the file list. Depends on font
   uint8_t txb_id(0);
@@ -902,29 +915,34 @@ void fb_window_callback(UG_MESSAGE* msg)
   }
 }
 
-void fb_draw_highlight(int16_t selected_line)
+void fb_draw_highlight(int16_t new_selected_line)
 {
   // Deselect the previously selected line
-  UG_TextboxSetBackColor(&fb_window, 2*fb_selected_line+1, C_WHITE);
+  int old_selected_line = fb_selected_line;
+  UG_TextboxSetBackColor(&fb_window, 2*old_selected_line+1, C_WHITE);
 
   // Change the selectionto the newly selected line
-  fb_selected_line = selected_line;
-
-  // TODO: Prevent highlighting empty lines
+  fb_selected_line = new_selected_line;
 
   // Limit the selection max and min.
   if (fb_selected_line < 0)
   { 
-    // TODO: Scroll through directory entries
     fb_skip_files--;
     fb_skip_files = (fb_skip_files < 0) ? 0 : fb_skip_files;
     fb_selected_line = 0;
   }
   if (fb_selected_line >= FB_LIST_SIZE)
   {
-    // TODO: Scroll through directory entries
     fb_skip_files++;
     fb_selected_line = FB_LIST_SIZE-1;
+  }
+
+  // Prevent highlighting empty lines
+  if(strcmp(UG_TextboxGetText(&fb_window, 2*new_selected_line+1), "") == 0)
+  {
+    // Undo the change in selection. We can't just do this earlier, because
+    // that would prevent list scrolling form working.
+    fb_selected_line = old_selected_line;
   }
 
   // Redraw highlight line in new location
@@ -932,6 +950,8 @@ void fb_draw_highlight(int16_t selected_line)
 
   // Update file list text
   update_file_list();
+
+  // Redraw file names and icons
   for(int i = 0; i < FB_LIST_SIZE; i++)
   {
     UG_TextboxSetText(&fb_window, 2*i, file_icon[i]);
@@ -939,65 +959,106 @@ void fb_draw_highlight(int16_t selected_line)
   }
 }
 
+int fi_compare(FileInfo* left, FileInfo* right)
+{
+  if(left->hidden)
+  {
+    return -1;
+  }
+  if(left->directory && !right->directory)
+  {
+    return -1;
+  }
+  if(!left->directory && right->directory)
+  {
+    return 1;
+  }
+  return strcmp(right->name, left->name);
+}
+
 void update_file_list()
 {
-  // List files in directory.
-  ser.println("Calling dirFile.open()"); // DEBUG
+  char temp_file_buffer[MAX_NAME] = {0};
+  QueueList<FileInfo> fileQueue;
+
+  // Open directory handle.
   if (!dirFile.isOpen() && !dirFile.open(selected_path_buffer, O_READ))
   {
     draw_BSOD(tft);
     sd.errorHalt(&tft, "open path failed");
   }
 
-  // Skip some files if we've hit the bottom of the file list
-  uint8_t s = 0;
-  while(s < fb_skip_files && file.openNext(&dirFile, O_READ))
+  // Build a list of file system entries in the current folder
+  while(file.openNext(&dirFile, O_READ))
   {
-    s++;
+    FileInfo newfile;
+    newfile.hidden = file.isHidden();
+    newfile.directory = file.isSubDir();
+    file.getName(temp_file_buffer, MAX_NAME);
     file.close();
+
+    if(strcmp(temp_file_buffer, "") == 0)
+    {
+      newfile.hidden = true;
+      strncpy(newfile.name, "<blank>", MAX_NAME);
+    }
+    else
+    {
+      strncpy(newfile.name, temp_file_buffer, MAX_NAME);
+    }
+
+    fileQueue.push(newfile);
   }
 
-  uint16_t files_found(0);
+  uint16_t display_index(0);
 
   // Item 0 is ".." if we are below the root
   if(strcmp(selected_path_buffer, "/") != 0)
   {
-    file_icon[files_found] = fa_icon_level_up;
-    strcpy(file_list_buffer[files_found], "..");
-    files_found++;
+    file_icon[display_index] = fa_icon_level_up;
+    strcpy(file_list_buffer[display_index], "..");
+    display_index++;
   }
 
-  while (files_found < FB_LIST_SIZE && file.openNext(&dirFile, O_READ))
+  // Limit skipping files to the maximum number of files in this folder
+  int max_skip = fileQueue.count()-FB_LIST_SIZE+2;
+  if (fb_skip_files > max_skip) { fb_skip_files = max_skip; }
+  int skipped_files = 0;
+
+  while (skipped_files < fb_skip_files && !fileQueue.isEmpty())
   {
-    // Skip directories and hidden files.
-    if (file.isHidden())
+    fileQueue.pop();
+    skipped_files++;
+  }
+
+  while (display_index < FB_LIST_SIZE && !fileQueue.isEmpty())
+  {
+    FileInfo currFile = fileQueue.pop();
+    if (currFile.hidden)
     {
       // skip hidden files
-      // file_icon[files_found] = fa_icon_hidden;
     }
-    else if(file.isSubDir())
+    else if(currFile.directory)
     {
-      file_icon[files_found] = fa_icon_folder_closed;
-      file.getName(file_list_buffer[files_found], MAX_NAME);
-      files_found++;
+      file_icon[display_index] = fa_icon_folder_closed;
+      strncpy(file_list_buffer[display_index], currFile.name, MAX_NAME);
+      display_index++;
     }
     else
     {
-      file_icon[files_found] = fa_icon_file_generic;
-      file.getName(file_list_buffer[files_found], MAX_NAME);
-      files_found++;
+      file_icon[display_index] = fa_icon_file_generic;
+      strncpy(file_list_buffer[display_index], currFile.name, MAX_NAME);
+      display_index++;
     }
-    
-    file.close();
   }
 
   // Blank out any unused entries in the list
-  if (files_found < FB_LIST_SIZE)
+  if (display_index < FB_LIST_SIZE)
   {
-    for (; files_found < FB_LIST_SIZE; files_found++)
+    for (; display_index < FB_LIST_SIZE; display_index++)
     {
-      file_icon[files_found] = fa_icon_blank;
-      file_list_buffer[files_found][0] = 0;
+      file_icon[display_index] = fa_icon_blank;
+      file_list_buffer[display_index][0] = 0;
     }
   }
 
