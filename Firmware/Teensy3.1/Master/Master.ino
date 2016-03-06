@@ -228,6 +228,8 @@ void fb_window_callback(UG_MESSAGE* msg);
 void fb_draw_highlight(int16_t line);
 void update_file_list();
 
+// String wrapping function
+void strnwrap(char* dest, int max_len, char* src, int width);
 
 // -----------------------------------------------------------------------------
 // Globals
@@ -286,6 +288,8 @@ UG_TEXTBOX fb_file_list[FB_LIST_SIZE];
 UG_TEXTBOX fb_icon_list[FB_LIST_SIZE];
 UG_OBJECT fb_window_buffer[(2*FB_LIST_SIZE)+6];
 char selected_path_buffer[MAX_PATH] = "/";
+char selected_file_buffer[MAX_PATH] = "";
+char selected_file_disp[MAX_PATH] = "";
 char file_list_buffer[FB_LIST_SIZE][MAX_NAME] = { 0 };
 const char* file_icon[FB_LIST_SIZE];
 
@@ -902,7 +906,9 @@ void fb_window_callback(UG_MESSAGE* msg)
       else
       {
         // If the selected item is a regular file
-        UG_TextboxSetText(&fb_window, curr_id, file_list_buffer[fb_selected_line]);
+        snprintf(selected_file_buffer, MAX_PATH, "%s/%s", selected_path_buffer, file_list_buffer[fb_selected_line]);
+        strnwrap(selected_file_disp, MAX_PATH, selected_file_buffer, 17);
+        UG_TextboxSetText(&fb_window, curr_id, selected_file_disp);
       }
       break;
 
@@ -1093,4 +1099,99 @@ void update_file_list()
   }
 
   dirFile.close();
+}
+
+
+// Line wrapping
+// Based on https://raw.githubusercontent.com/ryanuber/projects/master/C/wrap/wrap.c
+void strnwrap(char *out, int max_len, char *str, int columns)
+{
+    int len, n, w, wordlen=0, linepos=0, outlen=0;
+ 
+    /*
+     * Find length of string 'str' without using string.h
+     */
+    for( len=0; str[len]; ++len );
+ 
+    /*
+     * Allocate the full space of 'str' to 'word', so there is no possible way that the string
+     * could contain a word that does not fit into the 'word' variable.
+     */
+    char word[len];
+ 
+    /*
+     * Loop through each individual character in the passed array (str) and detect white space
+     * and word length to determine how to handle line wrapping.
+     */
+    for( n=0; n<=len && outlen<max_len; n++ )
+    {
+        /*
+         * Detect spaces and newlines. We cannot gurantee that the passed string is null-
+         * terminated, so we also need to handle cases where we reach the end of the string
+         * without encountering wite space characters.
+         */
+        if( str[n] == ' ' || str[n] == '/' || str[n] == '\n' || n == len )
+        {
+            /*
+             * If the current word will not fit on the current line, add a newline.
+             */
+            if( linepos > columns )
+            {
+                out[outlen++] = '\n';
+                linepos = wordlen;
+            }
+ 
+            /*
+             * Append the found word to the output and reset the word character array in
+             * preparation for accepting characters for the next word.
+             */
+            for( w=0; w<wordlen; w++ )
+            {
+                out[outlen++] = word[w];
+                word[w] = '\0';
+            }
+ 
+            /*
+             * If we reach the end of the string, add the null-terminator character.
+             */
+            if( n == len )
+                out[outlen] = '\0';
+ 
+            /*
+             * If we encounter a newline character, append it to the string as usual, but
+             * set the line position counter back to 0 (new line = start count from 0 again).
+             */
+            else if( str[n] == '\n' )
+            {
+                out[outlen] = str[n];
+                linepos=0;
+            }
+ 
+            /*
+             * If the word fits in the current line without trouble, just add the space.
+             */
+            else
+            {
+                out[outlen] = str[n];
+                linepos++;
+            }
+ 
+            /*
+             * Increment the final output length for the next loop, and set the word length
+             * counter back to 0 (newline or space = new word).
+             */
+            outlen++;
+            wordlen=0;
+        }
+ 
+        /*
+         * If the current character is in the middle of a word somewhere, just append it and
+         * move on, incrementing counters.
+         */
+        else
+        {
+            word[wordlen++] = str[n];
+            linepos++;
+        }
+    }
 }
