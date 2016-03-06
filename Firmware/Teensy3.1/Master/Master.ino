@@ -38,13 +38,11 @@
 //     * Physical MIDI port is OUT or THRU
 //     * Pass USB MIDI to physical MIDI OUT? (or should I always just do this?)
 // * Basic file browser
-//   * Handle long file names better (pick a sane max path length, not 32k...)
+//   * Handle long file names better
 //     * Add "..." to names that don't fit
 //   * Print full path to file in currently selected path dialog
 //     * Wrap every 17 characters (that is the length of the textbox)
-//   * Sort entries alphabetically
 //   * Dynamically show/hide the ".." (up) entry as the list is scrolled
-//   * Stop scrolling at the last item
 // * Playback of MIDI files (from SD card)
 //   * Play doorbel tone from sd "doorbell" folder :P
 // * Save options to EEPROM (or FLASH or whatever the Teensy has)
@@ -959,21 +957,48 @@ void fb_draw_highlight(int16_t new_selected_line)
   }
 }
 
-int fi_compare(FileInfo* left, FileInfo* right)
+// This function comparaes two FileInfo objects for the purpose of sorting.
+// It return -1 if left comes first and 1 if right comes first, or 0 if
+// it doesn't matter which is first. Note that 0 here _does not_ mean that the
+// items are equal. 
+// This function has to match the QueueList::Comparer function prototype.
+int fi_sort(FileInfo left_item, FileInfo right_item)
 {
-  if(left->hidden)
+  char left_name[MAX_NAME] = {0};
+  char right_name[MAX_NAME] = {0};
+
+  // If either item is hidden, order doesn't matter
+  if(left_item.hidden || right_item.hidden)
+  {
+    return 0;
+  }
+
+  // If only one item is a directory, that item comes first
+  if(left_item.directory && !right_item.directory)
   {
     return -1;
   }
-  if(left->directory && !right->directory)
-  {
-    return -1;
-  }
-  if(!left->directory && right->directory)
+  else if(!left_item.directory && right_item.directory)
   {
     return 1;
   }
-  return strcmp(right->name, left->name);
+
+  // If either item has no name, order does not matter
+  // (this should never happen)
+  if (!left_item.name || !right_item.name)
+  {
+    return 0;
+  }
+
+  // Compare the two items based on their names
+  strncpy(left_name, left_item.name, MAX_NAME);
+  strncpy(right_name, right_item.name, MAX_NAME);
+
+  // convert names to lower case, so that sorting is not case sensitive
+  for(char *p = left_name;*p;++p) { *p=*p>0x40&&*p<0x5b?*p|0x60:*p; }
+  for(char *p = right_name;*p;++p) { *p=*p>0x40&&*p<0x5b?*p|0x60:*p; }
+
+  return strcmp(left_name, right_name);
 }
 
 void update_file_list()
@@ -1009,6 +1034,8 @@ void update_file_list()
 
     fileQueue.push(newfile);
   }
+
+  fileQueue.sort(fi_sort);
 
   uint16_t display_index(0);
 

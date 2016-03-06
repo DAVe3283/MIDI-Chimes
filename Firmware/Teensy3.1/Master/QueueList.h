@@ -73,6 +73,9 @@ class QueueList {
     // get the number of items in the queue.
     int count () const;
 
+    typedef int (*Comparer)(const T, const T);
+    void sort (Comparer);
+
     // set the printer of the queue.
     void setPrinter (Print & p);
 
@@ -228,6 +231,35 @@ void QueueList<T>::blink () const {
   }
 
   // solution selected due to lack of exit() and assert().
+}
+
+template<typename T>
+void QueueList<T>::sort (Comparer comp)
+{
+  bool changed = false;
+
+  // bubble sort
+  int passes = 0;
+  do
+  {
+    changed = false;
+    for (link t = head; t != NULL; t = t->next)
+    {
+      link left = t;
+      link right = t->next;
+      if (comp(left->item, right->item) > 0)
+      {
+        // Swap the two items
+        T temp_item = left->item;
+        left->item = right->item;
+        right->item = temp_item;
+
+        changed = true;
+      }
+    }
+    passes++;
+  }
+  while(changed && passes < 1000);
 }
 
 #endif // _QUEUELIST_H
