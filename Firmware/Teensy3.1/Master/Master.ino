@@ -42,7 +42,6 @@
 //     * Add "..." to names that don't fit
 //   * Print full path to file in currently selected path dialog
 //     * Wrap every 17 characters (that is the length of the textbox)
-//   * Dynamically show/hide the ".." (up) entry as the list is scrolled
 // * Playback of MIDI files (from SD card)
 //   * Play doorbel tone from sd "doorbell" folder :P
 // * Save options to EEPROM (or FLASH or whatever the Teensy has)
@@ -1039,16 +1038,8 @@ void update_file_list()
 
   uint16_t display_index(0);
 
-  // Item 0 is ".." if we are below the root
-  if(strcmp(selected_path_buffer, "/") != 0)
-  {
-    file_icon[display_index] = fa_icon_level_up;
-    strcpy(file_list_buffer[display_index], "..");
-    display_index++;
-  }
-
   // Limit skipping files to the maximum number of files in this folder
-  int max_skip = fileQueue.count()-FB_LIST_SIZE+2;
+  int max_skip = fileQueue.count()-FB_LIST_SIZE+1; // Allow 1 blank line at the end
   if (fb_skip_files > max_skip) { fb_skip_files = max_skip; }
   int skipped_files = 0;
 
@@ -1056,6 +1047,15 @@ void update_file_list()
   {
     fileQueue.pop();
     skipped_files++;
+  }
+
+  // Item 0 is ".." if we are below the root, and we have not skipped
+  // any files (e.g.: at the top of the file list)
+  if(strcmp(selected_path_buffer, "/") != 0 && skipped_files == 0)
+  {
+    file_icon[display_index] = fa_icon_level_up;
+    strcpy(file_list_buffer[display_index], "..");
+    display_index++;
   }
 
   while (display_index < FB_LIST_SIZE && !fileQueue.isEmpty())
