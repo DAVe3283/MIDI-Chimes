@@ -992,6 +992,8 @@ int fi_sort(FileInfo left_item, FileInfo right_item)
   // Compare the two items based on their names
   strncpy(left_name, left_item.name, MAX_NAME);
   strncpy(right_name, right_item.name, MAX_NAME);
+  left_name[MAX_NAME] = 0;  // force null terminator
+  right_name[MAX_NAME] = 0;  // force null terminator
 
   // convert names to lower case, so that sorting is not case sensitive
   for(char *p = left_name;*p;++p) { *p=*p>0x40&&*p<0x5b?*p|0x60:*p; }
@@ -1025,10 +1027,12 @@ void update_file_list()
     {
       newfile.hidden = true;
       strncpy(newfile.name, "<blank>", MAX_NAME);
+      newfile.name[MAX_NAME] = 0;  // force null terminator
     }
     else
     {
       strncpy(newfile.name, temp_file_buffer, MAX_NAME);
+      temp_file_buffer[MAX_NAME] = 0;  // force null terminator
     }
 
     fileQueue.push(newfile);
@@ -1069,24 +1073,23 @@ void update_file_list()
     {
       file_icon[display_index] = fa_icon_folder_closed;
       strncpy(file_list_buffer[display_index], currFile.name, MAX_NAME);
+      file_list_buffer[display_index][MAX_NAME] = 0;  // force null terminator
       display_index++;
     }
     else
     {
       file_icon[display_index] = fa_icon_file_generic;
       strncpy(file_list_buffer[display_index], currFile.name, MAX_NAME);
+      file_list_buffer[display_index][MAX_NAME] = 0;  // force null terminator
       display_index++;
     }
   }
 
   // Blank out any unused entries in the list
-  if (display_index < FB_LIST_SIZE)
+  for (; display_index < FB_LIST_SIZE; display_index++)
   {
-    for (; display_index < FB_LIST_SIZE; display_index++)
-    {
-      file_icon[display_index] = fa_icon_blank;
-      file_list_buffer[display_index][0] = 0;
-    }
+    file_icon[display_index] = fa_icon_blank;
+    file_list_buffer[display_index][0] = 0;
   }
 
   dirFile.close();
