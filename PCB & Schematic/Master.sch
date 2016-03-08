@@ -6264,6 +6264,38 @@ W = angled&lt;p&gt;
 <rectangle x1="1.016" y1="-0.254" x2="1.524" y2="0.254" layer="51"/>
 <rectangle x1="6.096" y1="-0.254" x2="6.604" y2="0.254" layer="51"/>
 </package>
+<package name="MA03-1">
+<description>&lt;b&gt;PIN HEADER&lt;/b&gt;</description>
+<wire x1="-3.175" y1="1.27" x2="-1.905" y2="1.27" width="0.1524" layer="21"/>
+<wire x1="-1.905" y1="1.27" x2="-1.27" y2="0.635" width="0.1524" layer="21"/>
+<wire x1="-1.27" y1="-0.635" x2="-1.905" y2="-1.27" width="0.1524" layer="21"/>
+<wire x1="-1.27" y1="0.635" x2="-0.635" y2="1.27" width="0.1524" layer="21"/>
+<wire x1="-0.635" y1="1.27" x2="0.635" y2="1.27" width="0.1524" layer="21"/>
+<wire x1="0.635" y1="1.27" x2="1.27" y2="0.635" width="0.1524" layer="21"/>
+<wire x1="1.27" y1="-0.635" x2="0.635" y2="-1.27" width="0.1524" layer="21"/>
+<wire x1="0.635" y1="-1.27" x2="-0.635" y2="-1.27" width="0.1524" layer="21"/>
+<wire x1="-0.635" y1="-1.27" x2="-1.27" y2="-0.635" width="0.1524" layer="21"/>
+<wire x1="-3.81" y1="0.635" x2="-3.81" y2="-0.635" width="0.1524" layer="21"/>
+<wire x1="-3.175" y1="1.27" x2="-3.81" y2="0.635" width="0.1524" layer="21"/>
+<wire x1="-3.81" y1="-0.635" x2="-3.175" y2="-1.27" width="0.1524" layer="21"/>
+<wire x1="-1.905" y1="-1.27" x2="-3.175" y2="-1.27" width="0.1524" layer="21"/>
+<wire x1="1.27" y1="0.635" x2="1.905" y2="1.27" width="0.1524" layer="21"/>
+<wire x1="1.905" y1="1.27" x2="3.175" y2="1.27" width="0.1524" layer="21"/>
+<wire x1="3.175" y1="1.27" x2="3.81" y2="0.635" width="0.1524" layer="21"/>
+<wire x1="3.81" y1="-0.635" x2="3.175" y2="-1.27" width="0.1524" layer="21"/>
+<wire x1="3.175" y1="-1.27" x2="1.905" y2="-1.27" width="0.1524" layer="21"/>
+<wire x1="1.905" y1="-1.27" x2="1.27" y2="-0.635" width="0.1524" layer="21"/>
+<wire x1="3.81" y1="0.635" x2="3.81" y2="-0.635" width="0.1524" layer="21"/>
+<pad name="1" x="-2.54" y="0" drill="1.016" shape="long" rot="R90"/>
+<pad name="2" x="0" y="0" drill="1.016" shape="long" rot="R90"/>
+<pad name="3" x="2.54" y="0" drill="1.016" shape="long" rot="R90"/>
+<text x="-3.81" y="1.651" size="1.27" layer="25" ratio="10">&gt;NAME</text>
+<text x="-5.08" y="-0.635" size="1.27" layer="21" ratio="10">1</text>
+<text x="-3.81" y="-2.921" size="1.27" layer="27" ratio="10">&gt;VALUE</text>
+<rectangle x1="-0.254" y1="-0.254" x2="0.254" y2="0.254" layer="51"/>
+<rectangle x1="-2.794" y1="-0.254" x2="-2.286" y2="0.254" layer="51"/>
+<rectangle x1="2.286" y1="-0.254" x2="2.794" y2="0.254" layer="51"/>
+</package>
 </packages>
 <symbols>
 <symbol name="MA04-1">
@@ -6301,6 +6333,20 @@ W = angled&lt;p&gt;
 <pin name="4" x="7.62" y="0" visible="pad" length="middle" direction="pas" swaplevel="1" rot="R180"/>
 <pin name="5" x="7.62" y="2.54" visible="pad" length="middle" direction="pas" swaplevel="1" rot="R180"/>
 <pin name="6" x="7.62" y="5.08" visible="pad" length="middle" direction="pas" swaplevel="1" rot="R180"/>
+</symbol>
+<symbol name="MA03-1">
+<wire x1="3.81" y1="-5.08" x2="-1.27" y2="-5.08" width="0.4064" layer="94"/>
+<wire x1="1.27" y1="2.54" x2="2.54" y2="2.54" width="0.6096" layer="94"/>
+<wire x1="1.27" y1="0" x2="2.54" y2="0" width="0.6096" layer="94"/>
+<wire x1="1.27" y1="-2.54" x2="2.54" y2="-2.54" width="0.6096" layer="94"/>
+<wire x1="-1.27" y1="5.08" x2="-1.27" y2="-5.08" width="0.4064" layer="94"/>
+<wire x1="3.81" y1="-5.08" x2="3.81" y2="5.08" width="0.4064" layer="94"/>
+<wire x1="-1.27" y1="5.08" x2="3.81" y2="5.08" width="0.4064" layer="94"/>
+<text x="-1.27" y="-7.62" size="1.778" layer="96">&gt;VALUE</text>
+<text x="-1.27" y="5.842" size="1.778" layer="95">&gt;NAME</text>
+<pin name="1" x="7.62" y="-2.54" visible="pad" length="middle" direction="pas" swaplevel="1" rot="R180"/>
+<pin name="2" x="7.62" y="0" visible="pad" length="middle" direction="pas" swaplevel="1" rot="R180"/>
+<pin name="3" x="7.62" y="2.54" visible="pad" length="middle" direction="pas" swaplevel="1" rot="R180"/>
 </symbol>
 </symbols>
 <devicesets>
@@ -6342,6 +6388,29 @@ W = angled&lt;p&gt;
 <connect gate="1" pin="4" pad="4"/>
 <connect gate="1" pin="5" pad="5"/>
 <connect gate="1" pin="6" pad="6"/>
+</connects>
+<technologies>
+<technology name="">
+<attribute name="MF" value="" constant="no"/>
+<attribute name="MPN" value="" constant="no"/>
+<attribute name="OC_FARNELL" value="unknown" constant="no"/>
+<attribute name="OC_NEWARK" value="unknown" constant="no"/>
+</technology>
+</technologies>
+</device>
+</devices>
+</deviceset>
+<deviceset name="MA03-1" prefix="SV" uservalue="yes">
+<description>&lt;b&gt;PIN HEADER&lt;/b&gt;</description>
+<gates>
+<gate name="G$1" symbol="MA03-1" x="0" y="0"/>
+</gates>
+<devices>
+<device name="" package="MA03-1">
+<connects>
+<connect gate="G$1" pin="1" pad="1"/>
+<connect gate="G$1" pin="2" pad="2"/>
+<connect gate="G$1" pin="3" pad="3"/>
 </connects>
 <technologies>
 <technology name="">
@@ -7366,6 +7435,9 @@ diameter 2.54 mm, horizontal, grid 10.16 mm</description>
 <part name="GND7" library="supply1" deviceset="GND" device=""/>
 <part name="C3" library="resistor" deviceset="C-US" device="C0805" value="0.01u"/>
 <part name="U$2" library="DAVe3283" deviceset="MAX16997" device=""/>
+<part name="SV3" library="con-lstb" deviceset="MA03-1" device="" value="Doorbell"/>
+<part name="GND6" library="supply1" deviceset="GND" device=""/>
+<part name="P+8" library="supply1" deviceset="+5V" device=""/>
 </parts>
 <sheets>
 <sheet>
@@ -7414,6 +7486,9 @@ diameter 2.54 mm, horizontal, grid 10.16 mm</description>
 <instance part="GND7" gate="1" x="86.36" y="83.82"/>
 <instance part="C3" gate="G$1" x="38.1" y="96.52"/>
 <instance part="U$2" gate="G$1" x="55.88" y="104.14"/>
+<instance part="SV3" gate="G$1" x="-10.16" y="60.96"/>
+<instance part="GND6" gate="1" x="0" y="53.34"/>
+<instance part="P+8" gate="1" x="0" y="73.66"/>
 </instances>
 <busses>
 </busses>
@@ -7485,6 +7560,12 @@ diameter 2.54 mm, horizontal, grid 10.16 mm</description>
 <pinref part="GND7" gate="1" pin="GND"/>
 <wire x1="86.36" y1="86.36" x2="86.36" y2="88.9" width="0.1524" layer="91"/>
 <junction x="86.36" y="88.9"/>
+</segment>
+<segment>
+<pinref part="SV3" gate="G$1" pin="1"/>
+<pinref part="GND6" gate="1" pin="GND"/>
+<wire x1="-2.54" y1="58.42" x2="0" y2="58.42" width="0.1524" layer="91"/>
+<wire x1="0" y1="58.42" x2="0" y2="55.88" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="+5V" class="0">
@@ -7558,6 +7639,12 @@ diameter 2.54 mm, horizontal, grid 10.16 mm</description>
 <wire x1="40.64" y1="104.14" x2="38.1" y2="104.14" width="0.1524" layer="91"/>
 <wire x1="38.1" y1="104.14" x2="38.1" y2="106.68" width="0.1524" layer="91"/>
 <junction x="38.1" y="106.68"/>
+</segment>
+<segment>
+<pinref part="SV3" gate="G$1" pin="3"/>
+<pinref part="P+8" gate="1" pin="+5V"/>
+<wire x1="-2.54" y1="63.5" x2="0" y2="63.5" width="0.1524" layer="91"/>
+<wire x1="0" y1="63.5" x2="0" y2="71.12" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="AGND" class="0">
@@ -7928,6 +8015,14 @@ diameter 2.54 mm, horizontal, grid 10.16 mm</description>
 <pinref part="C3" gate="G$1" pin="1"/>
 <wire x1="40.64" y1="101.6" x2="38.1" y2="101.6" width="0.1524" layer="91"/>
 <wire x1="38.1" y1="101.6" x2="38.1" y2="99.06" width="0.1524" layer="91"/>
+</segment>
+</net>
+<net name="DOORBELL_IN" class="0">
+<segment>
+<pinref part="SV3" gate="G$1" pin="2"/>
+<pinref part="U$1" gate="G$1" pin="2"/>
+<wire x1="-2.54" y1="60.96" x2="20.32" y2="60.96" width="0.1524" layer="91"/>
+<label x="2.54" y="60.96" size="1.778" layer="95"/>
 </segment>
 </net>
 </nets>
