@@ -124,6 +124,7 @@ const uint8_t spi_mosi_pin(11);
 const uint8_t spi_miso_pin(12);
 const uint8_t led_pin(13);
 const uint8_t sd_cs_pin(15);
+const uint8_t doorbell_pin(2);
 
 // Touch Screen
 // Pins
