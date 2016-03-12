@@ -1,5 +1,8 @@
 // -----------------------------------------------------------------------------
-// Master.ino
+// Master.ino DOORBELL TESTS
+//
+// A quick test to make sure I can read the doorbell reliably, without randomly
+// having it go off in the night.
 //
 // The master Teensy that runs the MIDI chimes.
 // This teensy is responsible for running the display, USB and physical MIDI,
@@ -45,7 +48,7 @@
 // -----------------------------------------------------------------------------
 
 // Comment this line out if using the resistive touchscreen layer
-#define CAPACITIVE_TS
+//#define CAPACITIVE_TS
 
 // -----------------------------------------------------------------------------
 // Includes
@@ -144,6 +147,7 @@ const uint16_t ts_max_y(4000);
 
 // Timeouts
 const uint16_t blink_time(20000); // microseconds
+const uint32_t doorbell_debounce(500); // milliseconds
 
 // Graphics settings
 const uint16_t console_bg(0x0000); // Windows 98+ #000000 --> RGB565
@@ -203,6 +207,9 @@ bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out,
 // Adjust Master Volume
 void adjust_master_volume(int8_t change);
 
+// Doorbell ISR
+void doorbell_isr();
+
 // µGUI
 void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c);
 // µGUI Hardware Acceleration
@@ -240,6 +247,7 @@ bool play_this_program(true); // Do we play notes for the current program?
 
 // Timers
 elapsedMicros message_blink_timer;
+elapsedMillis doorbell_debounce_timer;
 
 // Serial IO
 HardwareSerial midi = HardwareSerial();
@@ -257,6 +265,10 @@ ILI9341_t3 tft = ILI9341_t3(lcd_cs_pin, lcd_dc_pin, lcd_reset_pin, spi_mosi_pin,
 #else
   Adafruit_STMPE610 ts = Adafruit_STMPE610(touch_cs_pin); // Touch sensor
 #endif
+
+// Doorbell
+volatile bool doorbell_pressed(false);
+bool doorbell_playing(false);
 
 // µGUI
 UG_GUI gui;
@@ -452,6 +464,10 @@ void setup()
   // Configure hardware MIDI
   midi.begin(31250, SERIAL_8N1);
 
+  // Configure doorbell
+  pinMode(doorbell_pin, INPUT);
+  attachInterrupt(digitalPinToInterrupt(doorbell_pin), doorbell_isr, RISING);
+
   // Draw Main Window
   draw_main_window();
 
@@ -462,12 +478,37 @@ void setup()
   draw_settings_window();
 
   // Start GUI at main window
-  UG_WindowShow(&main_window);
+  //UG_WindowShow(&main_window);
+
+  // Doorbell tests
+  UG_FontSelect(&FONT_6X8);
+  UG_ConsolePutString("Doorbell test. Press the button?\n");
 }
 
 // Main program loop
 void loop()
 {
+  // Doorbell press
+  if (doorbell_pressed)
+  {
+    doorbell_pressed = false;
+    doorbell_debounce_timer = 0;
+    if (!doorbell_playing)
+    {
+      // Start playing doorbell file here!
+      doorbell_playing = true;
+      char millis_buffer[9] = { 0 };
+      sprintf(millis_buffer, "%08lx", millis());
+      UG_ConsolePutString(millis_buffer);
+      UG_ConsolePutString(" Doorbell pressed!\n");
+    }
+  }
+  if (doorbell_playing && (doorbell_debounce_timer >= doorbell_debounce))
+  {
+    // Debounce doorbell
+    doorbell_playing = false;
+  }
+
   // Handle USB MIDI messages
   usbMIDI.read();
 
@@ -745,6 +786,11 @@ void adjust_master_volume(int8_t change)
     UG_ProgressbarSetText(&main_window, PRB_ID_0, volume_text_buffer);
     UG_ProgressbarSetValue(&main_window, PRB_ID_0, master_volume);
   }
+}
+
+void doorbell_isr()
+{
+  doorbell_pressed = true;
 }
 
 void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c)
