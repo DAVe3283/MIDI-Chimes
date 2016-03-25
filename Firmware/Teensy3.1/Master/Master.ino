@@ -1,3 +1,22 @@
+/*
+I played with the button a few times to make sure I can read it.
+
+millis() of button detections as I left it last:
+000009e3 (2.531s)
+00001e8c (7.820s)
+00004c58 (19.544s)
+0000d8f4 (55.540s)
+0000eda7 (1m 0.839s)
+00011bf7 (1m 12.695s)
+
+Any output beyond that means there was I2C traffic to the EEPROM. Which is bad.
+
+And there wasn't any!! After 2 days w/no unexpected traffic, I pressed it again:
+0b79610a (2d 5h 28m 24.074s from boot)
+
+So everything works great!
+*/
+
 // -----------------------------------------------------------------------------
 // Master.ino DOORBELL TESTS
 //
