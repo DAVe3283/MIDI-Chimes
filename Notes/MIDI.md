@@ -11,11 +11,47 @@ MIDI programs are basically instruments. A Program Change message is sent to a
 channel, and that channel is now supposed to be that instrument. Or that is what
 seems expected in the real world.
 
+## MIDI Keyboard Specific
+
+I bought a Monoprice [606607][] 49-Key MIDI keyboard to use with the chimes.
+I plan to take advantage of some of its features.
+
+The keyboard uses rotary encoder A1 to set the program (instrument) and encoder
+B2 to set the channel volume (Control Change for controler 0x07), 0-127.
+
+### Analog Slider
+
+There is an analog slider that I could use as an easier/quicker way to set the
+volume on the chimes. I should make this an option in the GUI.
+
+In the default config, it sends CC 147 (Master Volume), 0-127.
+
+| Position | Raw Value  |          Message          |
+| -------: | ---------: | ------------------------- |
+|       0% |   0 (0x00) | `F0 7F 7F 04 01 00 00 F7` |
+|      25% |  32 (0x20) | `F0 7F 7F 04 01 00 20 F7` |
+|      50% |  64 (0x40) | `F0 7F 7F 04 01 00 40 F7` |
+|      75% |  96 (0x60) | `F0 7F 7F 04 01 00 60 F7` |
+|     100% | 127 (0x7F) | `F0 7F 7F 04 01 00 7F F7` |
+
+I think it might be good to honor this as well as the channel volume.
+
+### Modulation Wheel
+
+This is probably present on more keyboards than an analog slider, so I might
+consider allowing this to control volume as well (as an option in the GUI).
+
+The message is the standard modulation wheel (Control Change for controller
+0x01), 0-127.
+
+This should probably be off by default, because this would not be any kind of
+expected behavior, and certainly wouldn't be intuitive.
+
 # Our Behavior
 
 Officially, we should make the user select a channel (1-16), and only listen to
 that channel. Additionally, we would only play notes on that channel if a
-program of 0xE (tubular bells) was selected.
+program of 14 (0x0E, tubular bells) was selected.
 
 However, we can't control/predict how MIDI files will be written. So the
 official behavior might end up not playing certain songs at all, or requiring
@@ -56,6 +92,11 @@ Downside: This would cause MIDI files not designed for chimes to play.
 
 This is probably a bad enough option it isn't worth implementing.
 
+## Decision
+
+I will follow the spec, but implement an "ALL" channel that listens for tubular
+bells on all channels. This will not be the default.
+
 # MIDI OUT / THRU
 
 I will be using a single combined OUT/THRU port, with behavior selected in
@@ -68,3 +109,5 @@ I am thinking there should be a setting to control if MIDI files played by the
 chimes send data to the MIDI OUT port or not.
 
 I guess, fundamentally, I don't know what I want to do with this port yet.
+
+[606607]:http://www.monoprice.com/product?p_id=606607

@@ -22,12 +22,17 @@
 // * Implement I2C timeout (properly) & handle I2C errors
 //   * Probably need a very short timeout (1ms or less) to avoid messing up song
 //     * Or should we just throw a giant error and abort playback?
+//       We can only do this for SD card playback, though.
 // * Implement settings
 //   * Store them to the SD card
 // * Handle MIDI program change events
 //   * We are technically Program 0xE "Tubular Bells"
 //   * We might want to handle other things, or everything on the channel?
-//     * This should probably be a setting.
+// * Handle MIDI Control Change messages
+//   * 0x07 is channel volume. Use that to adjust our volume
+// * Handle some System Exclusive messages
+//   * Master volume (F0 7F 7F 04 01 00 nn F7 where nn is volume 0-127)
+//     * This should probably be a setting, but it seems pretty safe.
 // * Make the display do useful things
 //   * Show errors
 //   * Show input source (USB or physical MIDI)
