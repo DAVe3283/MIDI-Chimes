@@ -10,10 +10,14 @@
 // * It looks like interrupts can fire inside setup()...
 //   * I should probably attach the I2C ISRs at the end then.
 // * wait for power supply to get enabled at startup, then settle, then measure channels
+//   * Should this be part of the startup sequence before allowing normal operation?
 // * periodically check if the power supply is enabled
 //   * if not, don't mark channels as shorted/open.
 //   * Probably just don't run the strike routine at all, so the verification never happens
-// * if a channel is shorted, turn off the master power supply
+// * if a channel becomes shorted, turn off the master power supply
+// * Should I implement some sort of cumulative current limit to protect the PCB?
+//   If each coil is 2A, and all 10 are told to fire, that's 20A through the PCB traces...
+//   Now imagine if they are 10A each O_o
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------

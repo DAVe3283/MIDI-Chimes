@@ -124,3 +124,23 @@ a chime is finished striking.
 
 This is purely informational, but might be fun to have a live display on the
 master of all the channel voltages.
+
+# Startup Process
+
+I need to come up with a startup process to auto-assign addresses to the slave
+boards, and verify everything is working (let the slaves verify PS voltage,
+etc.).
+
+## Fun Extras
+
+It would be interesting to test and see if the R_BE (Base-Emitter resistance)
+across the transistors is fairly consistent. From the data sheet, it looks to be
+0.45-0.56 ohms depending on current flow. My testing shows it vary from 120 ohms
+at 5mA then dropping quickly under 1 ohm by 1 A, and down to ~0.45 ohms at ~2.5
+amps.
+
+Perhaps instead, I could connect some various resistive (or inductive) loads and
+just make a calibration curve of feedback voltage (at 100% PWM) vs. current, if
+the transistors are consistent enough. Might be fun to have each coil's current
+consumption (and resistance, since we have the power supply voltage) show up in
+a diagnostics screen on the master.

@@ -7695,9 +7695,9 @@ diameter 2.54 mm, horizontal, grid 10.16 mm</description>
 <pinref part="U$2" gate="G$1" pin="WDI"/>
 </segment>
 <segment>
-<pinref part="U$1" gate="G$1" pin="9/RX2/PWM"/>
-<wire x1="20.32" y1="43.18" x2="2.54" y2="43.18" width="0.1524" layer="91"/>
-<label x="2.54" y="43.18" size="1.778" layer="95"/>
+<label x="2.54" y="45.72" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="8/TX3"/>
+<wire x1="20.32" y1="45.72" x2="2.54" y2="45.72" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="ADDR_LATCH" class="0">
@@ -7743,9 +7743,9 @@ diameter 2.54 mm, horizontal, grid 10.16 mm</description>
 <label x="259.08" y="50.8" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="U$1" gate="G$1" pin="16/A2/T"/>
-<wire x1="20.32" y1="25.4" x2="2.54" y2="25.4" width="0.1524" layer="91"/>
-<label x="2.54" y="25.4" size="1.778" layer="95"/>
+<pinref part="U$1" gate="G$1" pin="9/RX2/PWM"/>
+<wire x1="20.32" y1="43.18" x2="2.54" y2="43.18" width="0.1524" layer="91"/>
+<label x="2.54" y="43.18" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="LCD_CS" class="0">

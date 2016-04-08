@@ -169,7 +169,7 @@
 <text x="21.59" y="43.18" size="1.778" layer="25" align="center-left">MIDI Chimes
 Master Board
 DAVe3283
-2016-03-12</text>
+2016-04-08</text>
 <text x="53.34" y="4.445" size="2.54" layer="25" align="center">MIDI
 IN</text>
 <text x="67.31" y="48.895" size="2.54" layer="25" align="center">MIDI
@@ -2228,7 +2228,6 @@ Please make sure your boards conform to these design rules.</description>
 </signal>
 <signal name="PS_EN">
 <contactref element="SV1" pad="6"/>
-<contactref element="U$1" pad="9"/>
 <wire x1="4.135" y1="45.41" x2="3.81" y2="45.085" width="0.3048" layer="1"/>
 <wire x1="3.81" y1="45.085" x2="3.175" y2="45.085" width="0.3048" layer="1"/>
 <via x="3.175" y="45.085" extent="1-16" drill="0.6" shape="square"/>
@@ -2238,8 +2237,8 @@ Please make sure your boards conform to these design rules.</description>
 <wire x1="4.135" y1="46.6" x2="4.135" y2="45.41" width="0.3048" layer="1"/>
 <wire x1="3.175" y1="45.085" x2="0.635" y2="42.545" width="0.3048" layer="16"/>
 <wire x1="0.635" y1="42.545" x2="0.635" y2="12.065" width="0.3048" layer="16"/>
-<wire x1="27.94" y1="20.32" x2="25.4" y2="17.78" width="0.3048" layer="1"/>
-<wire x1="25.4" y1="17.78" x2="25.4" y2="10.16" width="0.3048" layer="1"/>
+<contactref element="U$1" pad="8"/>
+<wire x1="25.4" y1="10.16" x2="25.4" y2="20.32" width="0.3048" layer="1"/>
 </signal>
 <signal name="ADDR_LATCH">
 <contactref element="SV1" pad="5"/>
@@ -2265,9 +2264,13 @@ Please make sure your boards conform to these design rules.</description>
 </signal>
 <signal name="LCD_DC">
 <contactref element="M1" pad="D9"/>
-<contactref element="U$1" pad="16/A2"/>
-<wire x1="29.464" y1="50.8" x2="29.464" y2="37.084" width="0.3048" layer="1"/>
-<wire x1="29.464" y1="37.084" x2="27.94" y2="35.56" width="0.3048" layer="1"/>
+<contactref element="U$1" pad="9"/>
+<wire x1="27.94" y1="20.32" x2="27.94" y2="25.4" width="0.3048" layer="1"/>
+<wire x1="27.94" y1="25.4" x2="26.67" y2="26.67" width="0.3048" layer="1"/>
+<wire x1="26.67" y1="26.67" x2="26.67" y2="31.75" width="0.3048" layer="1"/>
+<wire x1="26.67" y1="31.75" x2="29.21" y2="34.29" width="0.3048" layer="1"/>
+<wire x1="29.21" y1="34.29" x2="29.21" y2="50.546" width="0.3048" layer="1"/>
+<wire x1="29.21" y1="50.546" x2="29.464" y2="50.8" width="0.3048" layer="1"/>
 </signal>
 <signal name="LCD_CS">
 <contactref element="M1" pad="D10"/>

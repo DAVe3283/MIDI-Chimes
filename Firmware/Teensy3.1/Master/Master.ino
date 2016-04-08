@@ -128,27 +128,31 @@ const uint8_t spi_sck_pin(14);
 const uint8_t spi_mosi_pin(11);
 const uint8_t spi_miso_pin(12);
 const uint8_t led_pin(13);
-const uint8_t sd_cs_pin(15);
+const uint8_t sd_cs_pin(21);
 const uint8_t doorbell_pin(2);
+const uint8_t ps_en_pin(8);
 
 // Touch Screen
 // Pins
-const uint8_t lcd_reset_pin(16);
-const uint8_t lcd_cs_pin(10);
+const uint8_t lcd_reset_pin(17);
+const uint8_t lcd_cs_pin(15);
 const uint8_t lcd_dc_pin(9);
 const uint8_t touch_cs_pin(20);
 // Backlight
-const uint8_t lcd_backlight_pin(4);
+const uint8_t lcd_backlight_pin(23);
 const uint8_t lcd_bl_pwm_bits(16);
 const uint32_t lcd_bl_pwm_freq(549); // Hz
-// Calibration
+#ifndef CAPACITIVE_TS
+// Resistive Touch Screen Calibration
 const uint16_t ts_min_x( 150);
 const uint16_t ts_max_x(3800);
 const uint16_t ts_min_y( 130);
 const uint16_t ts_max_y(4000);
+#endif
 
 // Timeouts
 const uint16_t blink_time(20000); // microseconds
+const uint16_t ps_en_toggle_time(1000); // microseconds
 
 // Graphics settings
 const uint16_t console_bg(0x0000); // Windows 98+ #000000 --> RGB565
@@ -240,11 +244,16 @@ bool play_all_programs(false); // Play all programs (instruments), or just Tubul
 
 int16_t fb_selected_line(0); // Which line in the file browse list is currently highlighted
 
+// Power supply
+bool ps_enabled(true); // Is the power supply enabled?
+bool ps_en_high(false); // Is the PS_EN pin high currently?
+
 // MIDI state
 bool play_this_program(true); // Do we play notes for the current program?
 
 // Timers
 elapsedMicros message_blink_timer;
+elapsedMicros ps_en_timer;
 
 // Serial IO
 HardwareSerial midi = HardwareSerial();
@@ -309,6 +318,11 @@ void setup()
 
   // Configure LED
   pinMode(led_pin, OUTPUT);
+
+  // Configure PS_EN
+  pinMode(ps_en_pin, OUTPUT);
+  digitalWrite(ps_en_pin, LOW);
+  ps_en_high = false;
 
   // Configure LCD backlight
   pinMode(lcd_backlight_pin, OUTPUT);
@@ -473,6 +487,26 @@ void setup()
 // Main program loop
 void loop()
 {
+  // Handle power supply
+  if (ps_en_timer > ps_en_toggle_time)
+  {
+    // Just reset the timer. A bit of jitter isn't a problem
+    ps_en_timer = 0;
+
+    // Toggle PS_EN state?
+    if (ps_enabled)
+    {
+      ps_en_high = !ps_en_high;
+    }
+    else
+    {
+      ps_en_high = false;
+    }
+
+    // Write to the pin
+    digitalWrite(ps_en_pin, ps_en_high ? HIGH : LOW);
+  }
+
   // Handle USB MIDI messages
   usbMIDI.read();
 
