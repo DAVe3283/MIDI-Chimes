@@ -1154,129 +1154,53 @@ const uint8_t bsod_text[] =
     0x01, 0xF7, 0x43, 0x23, 0x36, 0x23,
 };
 
-// Decompress a RLE bitmap into a raw bitmap
-uint16_t* decompress_RLE(const uint8_t* rle, const size_t& compressed, const size_t& uncompressed)
-{
-    // Allocate memory
-    uint16_t* bitmap = new uint16_t[uncompressed];
-    // WARNING: (nothrow) and exceptions don't work on Arduino (even Teensy3's
-    //          version), and asking for too much memory just hangs the program.
-    //          malloc() has the same problem.
-    //          Using FreeStack() from SdFat results in garbage values, so we
-    //          can't use that. So, really, we just have to hope for the best.
-
-    // If we got an allocation
-    if (bitmap)
-    {
-        size_t offset(0);
-        for (size_t i(0); i < compressed; i += 3)
-        {
-            const size_t run_length(rle[i]);
-            const uint16_t color(*reinterpret_cast<const uint16_t*>(rle + i + 1));
-            for (size_t r(0); r < run_length; ++r)
-            {
-                bitmap[offset++] = color;
-            }
-        }
-    }
-
-    // Return the data (or NULL)
-    return bitmap;
-}
-
 void draw_BSOD(ILI9341_t3& display)
 {
     // Set colors
     display.fillScreen(bsod_bg_windows_10);
     display.setTextColor(bsod_fg_windows_10);
 
+    // Decompression buffer (holds one row)
+    uint16_t buffer[max(bsod_frown_width, bsod_text_width)];
+
     // Decompress :( emoticon
-    uint16_t* bitmap = decompress_RLE(bsod_frown,
-        sizeof(bsod_frown) / sizeof(bsod_frown[0]),
-        bsod_frown_width * bsod_frown_height);
-
-    // Draw :( emoticon
-    if (bitmap)
+    size_t x(0);
+    int16_t y(0);
+    for (size_t i(0); i < (sizeof(bsod_frown) / sizeof(bsod_frown[0])); i += 3)
     {
-        // Mirror it
-        for (size_t y(0); y < bsod_frown_height; ++y)
+        size_t run_length(bsod_frown[i]);
+        const uint16_t color(*reinterpret_cast<const uint16_t*>(bsod_frown + i + 1));
+        for (size_t run(0); run < run_length; ++run)
         {
-            const size_t src_offset(bsod_frown_width * y);
-            const size_t dst_offset(bsod_frown_width * (bsod_frown_height - 1 - y));
-            memcpy(bitmap + dst_offset, bitmap + src_offset, bsod_frown_width * sizeof(bitmap[0]));
-        }
-
-        // Draw it
-        display.writeRect(20, 20, bsod_frown_width, bsod_frown_height, bitmap);
-    }
-    else
-    {
-        // Couldn't decompress (not enough memory)
-        // Draw during decompress (takes very little RAM, but is slow)
-        int offset(0);
-        for (size_t i(0); i < (sizeof(bsod_frown) / sizeof(bsod_frown[0])); i += 3)
-        {
-            uint8_t run_length(bsod_frown[i]);
-            const uint16_t color(*reinterpret_cast<const uint16_t*>(bsod_frown + i + 1));
-            do
+            buffer[x++] = color;
+            if (x >= bsod_frown_width)
             {
-                const int x(offset % bsod_frown_width);
-                const int y(offset / bsod_frown_width);
-                const int remaining_x(bsod_frown_width - x);
-                int run(remaining_x);
-                if (run_length < run)
-                {
-                    run = run_length;
-                }
-                run_length -= run;
-                offset += run;
-
-                // Top half
-                display.drawFastHLine(20 + x, 20 + y, run, color);
-
-                // Bottom half (mirrored)
-                display.drawFastHLine(20 + x, 20 + (bsod_frown_height - 1) - y, run, color);
-            } while (run_length > 0);
+                // Draw the buffer
+                display.writeRect(20, 20 + y++, bsod_frown_width, 1, buffer);
+                display.writeRect(20, 20 + bsod_frown_height - y, bsod_frown_width, 1, buffer);
+                x = 0; // Reset for next row
+            }
         }
     }
-    delete[] bitmap;
 
     // Decompress useless generic Windows 10 BSOD text
-    bitmap = decompress_RLE(bsod_text,
-        sizeof(bsod_text) / sizeof(bsod_text[0]),
-        bsod_text_width * bsod_text_height);
-
-    // Draw useless generic Windows 10 BSOD text
-    if (bitmap)
+    x = 0;
+    y = 0;
+    for (size_t i(0); i < (sizeof(bsod_text) / sizeof(bsod_text[0])); i += 3)
     {
-        display.writeRect(78, 30, bsod_text_width, bsod_text_height, bitmap);
-    }
-    else
-    {
-        // Couldn't decompress (not enough memory)
-        // Draw during decompress (takes very little RAM, but is slow)
-        int offset = 0;
-        for (size_t i(0); i < (sizeof(bsod_text) / sizeof(bsod_text[0])); i += 3)
+        size_t run_length(bsod_text[i]);
+        const uint16_t color(*reinterpret_cast<const uint16_t*>(bsod_text + i + 1));
+        for (size_t run(0); run < run_length; ++run)
         {
-            uint8_t run_length(bsod_text[i]);
-            const uint16_t color(*reinterpret_cast<const uint16_t*>(bsod_text + i + 1));
-            do
+            buffer[x++] = color;
+            if (x >= bsod_text_width)
             {
-                const int x(offset % bsod_text_width);
-                const int y(offset / bsod_text_width);
-                const int remaining_x(bsod_text_width - x);
-                int run(remaining_x);
-                if (run_length < run)
-                {
-                    run = run_length;
-                }
-                run_length -= run;
-                offset += run;
-                display.drawFastHLine(78 + x, 30 + y, run, color);
-            } while (run_length > 0);
+                // Draw the buffer
+                display.writeRect(78, 30 + y++, bsod_text_width, 1, buffer);
+                x = 0; // Reset for next row
+            }
         }
     }
-    delete[] bitmap;
 
     // Prepare to print error text
     display.setCursor(0, 124);
