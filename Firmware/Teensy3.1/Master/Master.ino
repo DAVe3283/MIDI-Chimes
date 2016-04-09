@@ -86,14 +86,16 @@ extern "C"
 // -----------------------------------------------------------------------------
 
 // I2C config
+const uint8_t i2c_slave_base_address(0x10); // Starting address for slaves
+const uint8_t i2c_slave_ack(0x06); // ACK sentinel expected from the slaves
 const uint8_t slave_addresses[] =
 {
-  'A', // Slave 0
-  'B', // Slave 1
-  'C', // Slave 2
+  0x10, // Slave 0
+  0x11, // Slave 1
+  0x12, // Slave 2
 };
 const size_t num_slaves(sizeof(slave_addresses)/sizeof(*slave_addresses));
-// TODO: auto-assignment of slave addresses
+// TODO: the number of slaves and the note mapping will be read from the config file
 
 // Note mapping
 const size_t notes_per_slave(10);
@@ -124,13 +126,14 @@ const uint16_t maximum_dc((1 << pwm_bits) - 1);
 const uint16_t minimum_dc(minimum_pwm * maximum_dc);
 
 // Pins
-const uint8_t spi_sck_pin(14);
 const uint8_t spi_mosi_pin(11);
 const uint8_t spi_miso_pin(12);
-const uint8_t led_pin(13);
+const uint8_t spi_sck_pin(14);
 const uint8_t sd_cs_pin(21);
 const uint8_t doorbell_pin(2);
 const uint8_t ps_en_pin(8);
+const uint8_t addr_latch_pin(10);
+const uint8_t led_pin(13);
 
 // Touch Screen
 // Pins
@@ -211,6 +214,10 @@ bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out,
 
 // Adjust Master Volume
 void adjust_master_volume(int8_t change);
+
+// Auto-assign I2C addresses to slaves
+uint8_t i2c_addr_auto_assign();
+bool i2c_check_ack(const uint8_t& address);
 
 // µGUI
 void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c);
@@ -300,8 +307,8 @@ char file_list_buffer[FB_LIST_SIZE][32] = { 0 };
 
 // Settings Window
 UG_WINDOW settings_window;
-UG_BUTTON settings_hw_accel_on_button;
-UG_BUTTON settings_hw_accel_off_button;
+UG_BUTTON settings_ps_on_button;
+UG_BUTTON settings_ps_off_button;
 UG_BUTTON settings_redraw_button;
 UG_BUTTON settings_close_button;
 UG_OBJECT obj_buff_settings_window[4];
@@ -318,6 +325,10 @@ void setup()
 
   // Configure LED
   pinMode(led_pin, OUTPUT);
+
+  // Configure address latch pin
+  pinMode(addr_latch_pin, OUTPUT);
+  digitalWrite(addr_latch_pin, LOW);
 
   // Configure PS_EN
   pinMode(ps_en_pin, OUTPUT);
@@ -358,8 +369,7 @@ void setup()
   UG_ConsolePutString("done.\n");
 
   // Configure I2C
-  Wire.begin(I2C_MASTER, 0, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
-  // TODO: check for fails
+  Wire1.begin(I2C_MASTER, 0, I2C_PINS_29_30, I2C_PULLUP_EXT, I2C_RATE_1000);
 
   // Initialize SD Card
   UG_ConsolePutString("Starting SD Card...");
@@ -371,6 +381,22 @@ void setup()
   UG_ConsolePutString("done.\n");
 
   // TODO: read config file
+
+  // Configure slave addresses
+  UG_ConsolePutString("Detecting slave boards...");
+  const uint8_t slaves_found(i2c_addr_auto_assign());
+  if (slaves_found == 0)
+  // TODO: compare with the expected slaves configuration in config file
+  {
+    draw_BSOD(tft);
+    tft.println("No slave boards found!");
+    tft.println();
+    tft.println("Check the cables are attached & oriented correctly.");
+    tft.println("Remove all power before retrying.");
+    // while (1) { yield(); }
+    // ^^^ TODO: disabled for debug, re-enable when I have all the slaves
+  }
+  UG_ConsolePutString("done.\n");
 
   //////////////////////////////////////////////////////////////////////////////
   // Directory list SD card
@@ -715,9 +741,9 @@ void send_chime(const uint8_t& address, const uint8_t& channel, const uint16_t& 
   memcpy(buffer + 1, &velocity, sizeof(uint16_t));
 
   // Send I2C message
-  Wire.beginTransmission(address);
-  Wire.write(buffer, sizeof(buffer));
-  Wire.endTransmission();
+  Wire1.beginTransmission(address);
+  Wire1.write(buffer, sizeof(buffer));
+  Wire1.endTransmission();
 }
 
 bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out, uint8_t& slave_channel_out)
@@ -784,6 +810,83 @@ void adjust_master_volume(int8_t change)
     UG_ProgressbarSetText(&main_window, PRB_ID_0, volume_text_buffer);
     UG_ProgressbarSetValue(&main_window, PRB_ID_0, master_volume);
   }
+}
+
+uint8_t i2c_addr_auto_assign()
+{
+  const uint16_t slave_latch_delay(100); // Microseconds
+  uint8_t slaves_found(0);
+  uint8_t slave_address(i2c_slave_base_address);
+
+  // Assign first slave's address (directly attached)
+  Wire1.beginTransmission(0);
+  Wire1.write(0x00); // Command = Set Address
+  Wire1.write(slave_address);
+  Wire1.endTransmission();
+
+  // Latch address
+  digitalWrite(addr_latch_pin, HIGH);
+  delayMicroseconds(slave_latch_delay);
+  digitalWrite(addr_latch_pin, LOW);
+
+  // Check for ACK
+  bool gotSlave(i2c_check_ack(slave_address++));
+  if (gotSlave)
+  {
+    slaves_found++;
+  }
+
+  // Handle remaining slaves (daisy chained)
+  while (gotSlave)
+  {
+    // Send next address
+    Wire1.beginTransmission(0);
+    Wire1.write(0x00); // Command = Set Address
+    Wire1.write(slave_address);
+    Wire1.endTransmission();
+
+    // Ask previous slave to latch the current slave for us
+    Wire1.beginTransmission(slave_address - 1);
+    Wire1.write(0x01); // Command = Set ADDR_LATCH
+    Wire1.write(HIGH);
+    Wire1.endTransmission();
+    delayMicroseconds(slave_latch_delay);
+    Wire1.beginTransmission(slave_address - 1);
+    Wire1.write(0x01); // Command = Set ADDR_LATCH
+    Wire1.write(LOW);
+    Wire1.endTransmission();
+
+    // Check for ACK
+    gotSlave = i2c_check_ack(slave_address++);
+    if (gotSlave)
+    {
+      slaves_found++;
+    }
+  };
+
+  // TODO: move this to somewhere after the power supply has been activated
+  for (int i(0); i < slaves_found; ++i)
+  {
+    Wire1.beginTransmission(i2c_slave_base_address + i);
+    Wire1.write(0x02); // Command = Startup Complete
+    Wire1.write(0x00); // Don't care
+    Wire1.endTransmission();
+  }
+
+  // Done!
+  return slaves_found;
+}
+
+bool i2c_check_ack(const uint8_t& address)
+{
+  // Look for a single ACK byte
+  if (Wire1.requestFrom(address, 1, I2C_STOP, 100) == 1) // We got 1 byte
+  {
+    // Is the byte an ACK?
+    return (Wire1.read() == i2c_slave_ack);
+  }
+
+  return false;
 }
 
 void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c)
@@ -922,17 +1025,17 @@ void draw_settings_window()
   UG_WindowResize(&settings_window, 20, 20, 319-20, 239-20);
   UG_WindowSetTitleText(&settings_window, "\xE6GUI Test Window");
   UG_WindowSetTitleTextFont(&settings_window, &FONT_8X12);
-  UG_ButtonCreate(&settings_window, &settings_hw_accel_on_button, BTN_ID_0, 10, 10, 100,  60);
+  UG_ButtonCreate(&settings_window, &settings_ps_on_button, BTN_ID_0, 10, 10, 100,  60);
   UG_ButtonSetFont(&settings_window, BTN_ID_0, &FONT_8X12);
-  UG_ButtonSetText(&settings_window, BTN_ID_0, "H/W Acc\nON");
+  UG_ButtonSetText(&settings_window, BTN_ID_0, "Power\nSupply\nON");
   UG_ButtonSetBackColor(&settings_window, BTN_ID_0, C_GREEN);
-  UG_ButtonCreate(&settings_window, &settings_hw_accel_off_button, BTN_ID_1, 10, 70, 100, 130);
+  UG_ButtonCreate(&settings_window, &settings_ps_off_button, BTN_ID_1, 10, 70, 100, 120);
   UG_ButtonSetFont(&settings_window, BTN_ID_1, &FONT_8X12);
-  UG_ButtonSetText(&settings_window, BTN_ID_1, "H/W Acc\nOFF");
+  UG_ButtonSetText(&settings_window, BTN_ID_1, "Power\nSupply\nOFF");
   UG_ButtonCreate(&settings_window, &settings_redraw_button, BTN_ID_2, 110, 10, 200, 60);
   UG_ButtonSetFont(&settings_window, BTN_ID_2, &FONT_8X12);
   UG_ButtonSetText(&settings_window, BTN_ID_2, "Redraw");
-  UG_ButtonCreate(&settings_window, &settings_close_button, BTN_ID_3, 110, 70, 200, 130);
+  UG_ButtonCreate(&settings_window, &settings_close_button, BTN_ID_3, 110, 70, 200, 120);
   UG_ButtonSetFont(&settings_window, BTN_ID_3, &FONT_8X12);
   UG_ButtonSetText(&settings_window, BTN_ID_3, "Close");
 }
@@ -945,26 +1048,24 @@ void settings_callback(UG_MESSAGE* msg)
   {
     switch (msg->sub_id)
     {
-    case BTN_ID_0:
-      UG_DriverEnable(DRIVER_DRAW_LINE);
-      UG_DriverEnable(DRIVER_FILL_FRAME);
+    case BTN_ID_0: // settings_ps_on_button
+      ps_enabled = true;
       UG_ButtonSetBackColor(&settings_window, BTN_ID_0, selected_color);
       UG_ButtonSetBackColor(&settings_window, BTN_ID_1, UG_WindowGetBackColor(&settings_window));
       break;
 
-    case BTN_ID_1:
-      UG_DriverDisable(DRIVER_DRAW_LINE);
-      UG_DriverDisable(DRIVER_FILL_FRAME);
+    case BTN_ID_1: // settings_ps_off_button
+      ps_enabled = false;
       UG_ButtonSetBackColor(&settings_window, BTN_ID_0, UG_WindowGetBackColor(&settings_window));
       UG_ButtonSetBackColor(&settings_window, BTN_ID_1, selected_color);
       break;
 
-    case BTN_ID_2:
+    case BTN_ID_2: // settings_redraw_button
       UG_WindowHide(&settings_window);
       UG_WindowShow(&settings_window);
       break;
 
-    case BTN_ID_3:
+    case BTN_ID_3: // settings_close_button
       UG_WindowHide(&settings_window);
       break;
 

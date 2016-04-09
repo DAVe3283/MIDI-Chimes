@@ -23,17 +23,18 @@
 // -----------------------------------------------------------------------------
 // Includes
 // -----------------------------------------------------------------------------
-#include "i2c_t3.h"
+#include <i2c_t3.h>
 
 
 // -----------------------------------------------------------------------------
 // Constants
 // -----------------------------------------------------------------------------
 
-// I2C Configuration
-const uint8_t i2c_address('A'); // Temporary until auto-config address is done
-const uint8_t addr_latch_i_pin(1); // Address latch input pin
-const uint8_t addr_latch_o_pin(2); // Address latch output pin
+// General I/O pins
+const uint8_t ps_enable_pin(0);     // Power supply enable pin
+const uint8_t addr_latch_i_pin(1);  // Address latch input pin
+const uint8_t addr_latch_o_pin(2);  // Address latch output pin
+const uint8_t led_pin(13);          // LED pin
 
 // PWM pins used by the chime coils
 const uint8_t chime_pins[] =
@@ -65,12 +66,6 @@ const uint8_t feedback_pins[num_channels] =
    A3, // Channel 9 (pin 17)
   A19, // Channel 10 (pin 30 on back)
 };
-
-// Power supply enable pin
-const uint8_t ps_enable_pin(0);
-
-// LED pin
-const uint8_t led_pin(13);
 
 // Timeouts
 const uint16_t strike_time( 90); // milliseconds
@@ -125,8 +120,14 @@ const uint16_t cooldown_period(1000);
 // -----------------------------------------------------------------------------
 // Declarations
 // -----------------------------------------------------------------------------
+// ISRs
+void i2c_startup(size_t numBytes);
 void i2c_receive(size_t numBytes);
-void i2c_requested();
+void i2c_startup_ack();
+void i2c_status_requested();
+
+// I2C address auto-assignment procedure
+void i2c_addr_auto_assign();
 
 // Strike a chime (handles thermals, settle time, etc.)
 void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle);
@@ -148,6 +149,10 @@ bool verify_off(const uint8_t& channel);
 // -----------------------------------------------------------------------------
 // Globals
 // -----------------------------------------------------------------------------
+
+// I2C
+volatile uint8_t i2c_address(0); // Assigned during startup
+volatile bool i2c_ready(false); // Only goes true once we have completed address auto-assignment routine
 
 // Timers
 elapsedMillis cooldown_timer;
@@ -188,11 +193,17 @@ bool any_shorted(false); // Are any channels shorted?
 // Initial setup routine
 void setup()
 {
+  // Configure address latch pins
+  pinMode(addr_latch_i_pin, INPUT);
+  pinMode(addr_latch_o_pin, OUTPUT);
+  digitalWrite(addr_latch_o_pin, LOW);
+
   // High-Z the PS_Enable pin
   pinMode(ps_enable_pin, INPUT);
 
   // Configure LED
   pinMode(led_pin, OUTPUT);
+  digitalWrite(led_pin, HIGH); // On until we have an address and I2C is ready
 
   // Configure analog inputs
   analogReadResolution(analog_read_bits);
@@ -212,11 +223,8 @@ void setup()
   // Diagnostics
   usb.begin(9600);
 
-  // Configure I2C
-  // TODO: address auto-config
-  Wire.begin(I2C_SLAVE, i2c_address, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
-  Wire.onReceive(i2c_receive);
-  Wire.onRequest(i2c_requested);
+  // I2C address auto-config
+  i2c_addr_auto_assign();
 
   // Measure power supply voltages at boot
   // DEBUG: Delay to let power supply reading stabilize
@@ -264,6 +272,9 @@ void setup()
       any_shorted = true;
     }
   }
+
+  // Startup complete
+  digitalWrite(led_pin, LOW); // Indicate normal operation
 }
 
 // Main program loop
@@ -390,13 +401,52 @@ void loop()
 
     case 's':
     case 'S':
-      i2c_requested();
+      i2c_status_requested();
       break;
 
     default:
       // Echo unknown commands (sanity check the serial link)
       usb.print(incomingByte);
       break;
+    }
+  }
+}
+
+void i2c_startup(size_t numBytes)
+{
+  usb.print("Got ");
+  usb.print(numBytes);
+  usb.println(" bytes of I2C data.");
+  // We are expecting 2 bytes (command, value)
+  if (numBytes == 2)
+  {
+    const uint8_t command(Wire.read());
+    const uint8_t value(Wire.read());
+    usb.print("Got command 0x");
+    usb.print(command, HEX);
+    usb.print(", value = 0x");
+    usb.println(value, HEX);
+
+    switch (command)
+    {
+      // Potential new address
+      case 0x00:
+        i2c_address = value;
+        break;
+
+      // Requesting a latch
+      case 0x01:
+        digitalWrite(addr_latch_o_pin, value);
+        break;
+
+      // Startup complete
+      case 0x02:
+        i2c_ready = true;
+        break;
+
+      // Unknown commands
+      default:
+        break;
     }
   }
 }
@@ -423,7 +473,13 @@ void i2c_receive(size_t numBytes)
   message_blink_timer = 0;
 }
 
-void i2c_requested()
+void i2c_startup_ack()
+{
+  // Write ACK
+  Wire.write(0x06);
+}
+
+void i2c_status_requested()
 {
   // Create buffer to hold message
   uint8_t buffer[6 + (4 * num_channels)];
@@ -456,17 +512,39 @@ void i2c_requested()
   const size_t wrote(Wire.write(buffer, sizeof(buffer)));
   message_blink_timer = 0;
 
-  if (debug)
+  if (debug && (wrote != sizeof(buffer)))
   {
-    if (wrote != sizeof(buffer))
-    {
-      usb.print("I2C transmission failed! Tried to write ");
-      usb.print(sizeof(buffer));
-      usb.print(" bytes, but was only able to write ");
-      usb.print(wrote);
-      usb.println(" bytes.");
-    }
+    usb.print("I2C transmission failed! Tried to write ");
+    usb.print(sizeof(buffer));
+    usb.print(" bytes, but was only able to write ");
+    usb.print(wrote);
+    usb.println(" bytes.");
   }
+}
+
+void i2c_addr_auto_assign()
+{
+  // Watch for address broadcast
+  noInterrupts();
+  Wire.begin(I2C_SLAVE, i2c_address, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
+  Wire.onReceive(i2c_startup); // Handle startup messages
+  interrupts();
+
+  // Wait for ADDR_LATCH before committing the address
+  while ((digitalRead(addr_latch_i_pin) == LOW) || (i2c_address == 0)) {};
+
+  // Switch to the new address
+  noInterrupts();
+  Wire.begin(I2C_SLAVE, i2c_address, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
+  Wire.onRequest(i2c_startup_ack); // Ready to send ACK when requested
+  interrupts();
+
+  // Wait for the master to say we are done
+  while (!i2c_ready) {};
+
+  // I2C setup complete, switch to runtime ISRs
+  Wire.onReceive(i2c_receive);
+  Wire.onRequest(i2c_status_requested);
 }
 
 void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)

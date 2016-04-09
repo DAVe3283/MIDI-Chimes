@@ -127,9 +127,38 @@ master of all the channel voltages.
 
 # Startup Process
 
-I need to come up with a startup process to auto-assign addresses to the slave
-boards, and verify everything is working (let the slaves verify PS voltage,
-etc.).
+The startup process is a bit more complex, and might stretch the spec a bit...
+
+The slaves power up and start listening on the I2C General Call Address (0x00).
+All slaves listen simultaneously, since the bus is shared.
+
+## Commands
+
+The master uses 2 byte messages during startup. The 1st byte is a command, and
+the 2nd byte is the value. The meaning of the value is described below.
+
+|        Command        |                    Value                    |
+|-----------------------|---------------------------------------------|
+| 0x00 Set Address      | Address to use if/when ADDR_LATCH goes high |
+| 0x01 Set ADDR_LATCH   | Set the output ADDR_LATCH pin to this value |
+| 0x02 Startup Complete | Startup complete, begin normal operation    |
+
+### 0x00 Set Address
+
+When this command is received, all slaves prepare to switch to this address.
+But only when ADDR_LATCH_IN goes high does it take effect, so only one slave
+will actually get assigned to the address.
+
+### 0x01 Set ADDR_LATCH
+
+Since only the first slave is connected to the master directly, the master has
+to request downstream slaves set their ADDR_LATCH_OUT, so that the next slave in
+line latches the last address sent.
+
+### 0x02 Startup Compete
+
+When the master is done with a slave, it sends this, telling the slave to begin
+normal operation.
 
 ## Fun Extras
 

@@ -2,12 +2,12 @@ Notes about the slave board.
 
 Voltage measured with transistor on 100%:
 
-| Current (mA) | Voltate |
-| -----------: | ------- |
-|            5 |     0.6 |
-|         1000 |     0.8 |
-|         2000 |     0.9 |
-| Actual Coils |     1.1 |
+| Current (mA) | Voltage |  R_BE |
+| -----------: | ------- | ----: |
+|            5 |     0.6 | 120.0 |
+|         1000 |     0.8 |   0.8 |
+|         2000 |     0.9 |  0.45 |
+| Actual Coils |     1.1 | ~0.44 |
 
 So any voltage over 0.5V at boot means something is connected.
 I should probably consider anything under 1.5V (and < 50% ps_setpoint) shorted at startup.
@@ -17,7 +17,7 @@ voltage, and use that for the percentage calculations to verify operation?
 
 Perhaps some testing with the real chimes is in order...
 
-Measued values from my chimes.
+Measured values from my chimes.
 Ideal values calced with
     ideal_voltage = ps_setpoint - ((ps_setpoint - transistor_Vce_drop) * set_dc[channel])
     ps_setpoint = 19.13
