@@ -1163,35 +1163,49 @@ void draw_BSOD(ILI9341_t3& display)
     int offset(0);
     for (size_t i(0); i < (sizeof(bsod_frown) / sizeof(bsod_frown[0])); i += 3)
     {
-        const uint8_t run_length(bsod_frown[i]);
+        uint8_t run_length(bsod_frown[i]);
         const uint16_t color(*reinterpret_cast<const uint16_t*>(bsod_frown + i + 1));
-        for (int r(0); r < run_length; ++r)
+        do
         {
             const int x(offset % bsod_frown_width);
             const int y(offset / bsod_frown_width);
-            offset++;
+            const int remaining_x(bsod_frown_width - x);
+            int run(remaining_x);
+            if (run_length < run)
+            {
+                run = run_length;
+            }
+            run_length -= run;
+            offset += run;
 
             // Top half
-            display.drawPixel(20 + x, 20 + y, color);
+            display.drawFastHLine(20 + x, 20 + y, run, color);
 
             // Bottom half (mirrored)
-            display.drawPixel(20 + x, 20 + (bsod_frown_height - 1) - y, color);
-        }
+            display.drawFastHLine(20 + x, 20 + (bsod_frown_height - 1) - y, run, color);
+        } while (run_length > 0);
     }
 
     // Decompress useless generic Windows 10 BSOD text
     offset = 0;
     for (size_t i(0); i < (sizeof(bsod_text) / sizeof(bsod_text[0])); i += 3)
     {
-        const uint8_t run_length(bsod_text[i]);
+        uint8_t run_length(bsod_text[i]);
         const uint16_t color(*reinterpret_cast<const uint16_t*>(bsod_text + i + 1));
-        for (int r(0); r < run_length; ++r)
+        do
         {
             const int x(offset % bsod_text_width);
             const int y(offset / bsod_text_width);
-            display.drawPixel(78 + x, 30 + y, color);
-            offset++;
-        }
+            const int remaining_x(bsod_text_width - x);
+            int run(remaining_x);
+            if (run_length < run)
+            {
+                run = run_length;
+            }
+            run_length -= run;
+            offset += run;
+            display.drawFastHLine(78 + x, 30 + y, run, color);
+        } while (run_length > 0);
     }
 
     // Prepare to print error text

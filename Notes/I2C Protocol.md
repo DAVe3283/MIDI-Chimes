@@ -141,7 +141,7 @@ the 2nd byte is the value. The meaning of the value is described below.
 |-----------------------|---------------------------------------------|
 | 0x00 Set Address      | Address to use if/when ADDR_LATCH goes high |
 | 0x01 Set ADDR_LATCH   | Set the output ADDR_LATCH pin to this value |
-| 0x02 Startup Complete | Startup complete, begin normal operation    |
+| 0x02 Startup Complete | Value is currently ignored                  |
 
 ### 0x00 Set Address
 
@@ -158,7 +158,7 @@ line latches the last address sent.
 ### 0x02 Startup Compete
 
 When the master is done with a slave, it sends this, telling the slave to begin
-normal operation.
+normal operation. The value sent with this command is currently ignored.
 
 ## Fun Extras
 
