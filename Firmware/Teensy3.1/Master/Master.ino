@@ -366,7 +366,7 @@ void setup()
   {
     draw_BSOD(tft);
     tft.println("Unable to start touchscreen.");
-    while (1) { yield(); }
+    halt_system();
   }
   UG_ConsolePutString("done.\n");
 
@@ -395,7 +395,7 @@ void setup()
     tft.println();
     tft.println("Check the cables are attached & oriented correctly.");
     tft.println("Remove all power before retrying.");
-    // while (1) { yield(); }
+    // halt_system();
     // ^^^ TODO: disabled for debug, re-enable when I have all the slaves
   }
   UG_ConsolePutString("done.\n");
