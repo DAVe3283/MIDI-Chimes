@@ -7234,7 +7234,7 @@ UG_RESULT UG_CheckboxHide( UG_WINDOW* wnd, UG_U8 id )
    return UG_RESULT_OK;
 }
 
-UG_RESULT UG_CheckboxSetCheched( UG_WINDOW* wnd, UG_U8 id, UG_U8 ch )
+UG_RESULT UG_CheckboxSetChecked( UG_WINDOW* wnd, UG_U8 id, UG_U8 ch )
 {
    UG_OBJECT* obj=NULL;
    UG_CHECKBOX* btn=NULL;
@@ -7628,14 +7628,13 @@ void _UG_CheckboxUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
          chb->state &= ~CHB_STATE_PRESSED;
          obj->state |= OBJ_STATE_UPDATE;
          obj->event = OBJ_EVENT_RELEASED;
-          
-         chb->checked = !chb->checked; 
       }
       /* Handle 'click' event */
       if ( obj->touch_state & OBJ_TOUCH_STATE_CLICK_ON_OBJECT )
       {
          obj->event = CHB_EVENT_CLICKED;
          obj->state |= OBJ_STATE_UPDATE;
+         chb->checked = !chb->checked;
       }
       obj->touch_state &= ~OBJ_TOUCH_STATE_CHANGED;
    }

@@ -311,7 +311,9 @@ UG_BUTTON settings_ps_on_button;
 UG_BUTTON settings_ps_off_button;
 UG_BUTTON settings_redraw_button;
 UG_BUTTON settings_close_button;
-UG_OBJECT obj_buff_settings_window[4];
+UG_CHECKBOX settings_override_velocity_checkbox;
+UG_CHECKBOX settings_play_all_programs_checkbox;
+UG_OBJECT obj_buff_settings_window[6];
 
 // -----------------------------------------------------------------------------
 // Function Definitions
@@ -1038,6 +1040,14 @@ void draw_settings_window()
   UG_ButtonCreate(&settings_window, &settings_close_button, BTN_ID_3, 110, 70, 200, 120);
   UG_ButtonSetFont(&settings_window, BTN_ID_3, &FONT_8X12);
   UG_ButtonSetText(&settings_window, BTN_ID_3, "Close");
+  UG_CheckboxCreate(&settings_window, &settings_override_velocity_checkbox, CHB_ID_0, 10, 130, 200, 150);
+  UG_CheckboxSetFont(&settings_window, CHB_ID_0, &FONT_8X12);
+  UG_CheckboxSetText(&settings_window, CHB_ID_0, "Override Velocity");
+  UG_CheckboxSetChecked(&settings_window, CHB_ID_0, static_cast<UG_U8>(override_velocity));
+  UG_CheckboxCreate(&settings_window, &settings_play_all_programs_checkbox, CHB_ID_1, 10, 160, 200, 180);
+  UG_CheckboxSetFont(&settings_window, CHB_ID_1, &FONT_8X12);
+  UG_CheckboxSetText(&settings_window, CHB_ID_1, "Play All Programs");
+  UG_CheckboxSetChecked(&settings_window, CHB_ID_1, static_cast<UG_U8>(play_all_programs));
 }
 
 void settings_callback(UG_MESSAGE* msg)
@@ -1067,6 +1077,24 @@ void settings_callback(UG_MESSAGE* msg)
 
     case BTN_ID_3: // settings_close_button
       UG_WindowHide(&settings_window);
+      break;
+
+    default:
+      break;
+    }
+  }
+  else if ((msg->type == MSG_TYPE_OBJECT) &&
+           (msg->id == OBJ_TYPE_CHECKBOX) &&
+           (msg->event == CHB_EVENT_CLICKED))
+  {
+    switch (msg->sub_id)
+    {
+    case CHB_ID_0: // settings_override_velocity_checkbox
+      override_velocity = (UG_CheckboxGetChecked(&settings_window, CHB_ID_0) != 0);
+      break;
+
+    case CHB_ID_1: // settings_play_all_programs_checkbox
+      play_all_programs = (UG_CheckboxGetChecked(&settings_window, CHB_ID_1) != 0);
       break;
 
     default:
