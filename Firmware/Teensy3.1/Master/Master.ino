@@ -137,10 +137,16 @@ const uint16_t ts_max_x(3800);
 const uint16_t ts_min_y( 130);
 const uint16_t ts_max_y(4000);
 #endif
+// Backlight brightness
+const uint16_t lcd_bl_pwm_max(0xFFFF);
+const uint16_t lcd_bl_pwm_min(0x0C00);
+const uint16_t lcd_bl_pwm_step((lcd_bl_pwm_max - lcd_bl_pwm_min) / 2500);
+// We want to take 2500 ms to bring the backlight up, as that is how long the PS takes to settle.
 
 // Timeouts
 const uint16_t blink_time(20000); // microseconds
 const uint16_t ps_en_toggle_time(1000); // microseconds
+const uint16_t sleep_time(5000); // milliseconds (5 minutes = 300000)
 
 // Graphics settings
 const uint16_t console_bg(0x0000); // Windows 98+ #000000 --> RGB565
@@ -161,6 +167,7 @@ const char fa_icon_file_generic[] = "d";   // File, Generic (outline)
 const char fa_icon_file_picture[] = "k";   // File, Picture / Image (outline)
 const char fa_icon_file_sound[] = "m";     // File, Sound / Music (outline)
 const char fa_icon_file_config[] = "o";    // File, Code / Config (outline)
+const char fa_icon_sleep_leaf[] = "C";     // Leaf (sleep)
 
 // MIDI Commands
 const uint8_t midi_cmd_note_off(0x80);
@@ -174,6 +181,14 @@ const uint8_t midi_cmd_system_exclusive(0xF0);
 
 // MIDI Programs (Instruments)
 const uint8_t midi_prog_tubular_bells(0xE);
+
+enum power_state_t
+{
+  awake,
+  sleep,
+  awake_to_sleep_transition,
+  sleep_to_awake_transition,
+} power_state;
 
 
 // -----------------------------------------------------------------------------
@@ -203,17 +218,26 @@ void adjust_master_volume(int8_t change);
 uint8_t i2c_addr_auto_assign();
 bool i2c_check_ack(const uint8_t& address);
 
+// Sleep mode functions
+void power_activity(); // Activity detected, exit sleep mode & reset timer
+void power_state_update(); // Update power state, display brightness, etc.
+bool backlight_up(); // Increases backlight
+bool backlight_down(); // Decreases backlight
+void begin_sleep(); // Begin sleep process
+void begin_wake(); // Begin wakeup process
+void wake_complete(); // Finish wakeup process
+
 // µGUI
 void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c);
 // µGUI Hardware Acceleration
 UG_RESULT _HW_DrawLine(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c);
 UG_RESULT _HW_FillFrame(UG_S16 x1, UG_S16 y1, UG_S16 x2, UG_S16 y2, UG_COLOR c);
 
-// Main Window
+// Main window
 void draw_main_window();
 void main_callback(UG_MESSAGE* msg);
 
-// Settings Window
+// Settings window
 void draw_settings_window();
 void settings_callback(UG_MESSAGE* msg);
 
@@ -221,6 +245,10 @@ void settings_callback(UG_MESSAGE* msg);
 void draw_fb_window();
 void fb_window_callback(UG_MESSAGE* msg);
 void fb_draw_highlight(int16_t line);
+
+// Sleep window
+void draw_sleep_window();
+void sleep_callback(UG_MESSAGE* msg);
 
 
 // -----------------------------------------------------------------------------
@@ -240,12 +268,16 @@ int16_t fb_selected_line(0); // Which line in the file browse list is currently 
 bool ps_enabled(true); // Is the power supply enabled?
 bool ps_en_high(false); // Is the PS_EN pin high currently?
 
+// Backlight
+uint16_t backlight_pwm(lcd_bl_pwm_max);
+
 // MIDI state
 bool play_this_program(true); // Do we play notes for the current program?
 
 // Timers
 elapsedMicros message_blink_timer;
 elapsedMicros ps_en_timer;
+elapsedMillis sleep_timer;
 
 // Serial IO
 HardwareSerial midi = HardwareSerial();
@@ -300,6 +332,12 @@ UG_CHECKBOX settings_override_velocity_checkbox;
 UG_CHECKBOX settings_play_all_programs_checkbox;
 UG_OBJECT obj_buff_settings_window[6];
 
+// Sleep window
+UG_WINDOW sleep_window;
+UG_TEXTBOX sleep_icon;
+UG_TEXTBOX sleep_text;
+UG_OBJECT obj_buff_sleep_window[2];
+
 // -----------------------------------------------------------------------------
 // Function Definitions
 // -----------------------------------------------------------------------------
@@ -326,7 +364,7 @@ void setup()
   pinMode(lcd_backlight_pin, OUTPUT);
   analogWriteResolution(lcd_bl_pwm_bits);
   analogWriteFrequency(lcd_backlight_pin, lcd_bl_pwm_freq);
-  analogWrite(lcd_backlight_pin, (1 << lcd_bl_pwm_bits) - 1);
+  analogWrite(lcd_backlight_pin, backlight_pwm);
 
   // Configure TFT
   tft.begin();
@@ -559,17 +597,27 @@ void setup()
   // Settings window
   draw_settings_window();
 
+  // Sleep window
+  draw_sleep_window();
+
   // Start GUI at main window
   UG_WindowShow(&main_window);
+
+  // Set initial power state
+  power_state = awake;
+  sleep_timer = 0;
 }
 
 // Main program loop
 void loop()
 {
+  // Manage power state (sleep)
+  power_state_update();
+
   // Handle power supply
   if (ps_en_timer > ps_en_toggle_time)
   {
-    // Just reset the timer. A bit of jitter isn't a problem
+    // Just reset the timer. A bit of jitter isn't a problem, but wind-up is.
     ps_en_timer = 0;
 
     // Toggle PS_EN state?
@@ -593,6 +641,8 @@ void loop()
   int midi_bytes_available;
   while ((midi_bytes_available = midi.available()) > 0)
   {
+    power_activity();
+
     const uint8_t status(midi.peek());
 
     // Drop non-command data until the buffer starts with a command
@@ -688,6 +738,8 @@ void loop()
 #ifdef CAPACITIVE_TS
   if (touched)
   {
+    power_activity();
+
     // Retrieve a point
     TS_Point p = ts.getPoint();
 
@@ -705,6 +757,8 @@ void loop()
 #else // Resistive touch screen
   if (!ts.bufferEmpty())
   {
+    power_activity();
+
     // Retrieve a point
     TS_Point p = ts.getPoint();
 
@@ -732,6 +786,8 @@ void loop()
 
 void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
 {
+  power_activity();
+
   // MIDI spec allows turning a note off by sending a note on with velocity = 0
   // We don't care about note off ;)
   if (velocity == 0)
@@ -759,6 +815,8 @@ void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
 
 void OnProgramChange(uint8_t channel, uint8_t program)
 {
+  power_activity();
+
   if (channel == our_channel)
   {
     play_this_program = play_all_programs || (program == midi_prog_tubular_bells);
@@ -950,6 +1008,146 @@ bool i2c_check_ack(const uint8_t& address)
   return false;
 }
 
+void power_activity()
+{
+  // Wake system
+  if ((power_state != awake) && (power_state != sleep_to_awake_transition))
+  {
+    begin_wake();
+  }
+
+  // Reset sleep timer
+  sleep_timer = 0;
+}
+
+void power_state_update()
+{
+  // Awake & idle
+  if ((power_state == awake) && (sleep_timer >= sleep_time))
+  {
+    begin_sleep();
+  }
+
+  // Falling asleep
+  if (power_state == awake_to_sleep_transition)
+  {
+    // Dim backlight
+    if (sleep_timer >= 1)
+    {
+      sleep_timer -= 1;
+      if (!backlight_down())
+      {
+        // We are at the minimum, so we are fully asleep
+        power_state = sleep;
+        sleep_timer = 0;
+        UG_TextboxSetText(&sleep_window, TXB_ID_1, "Standby Mode\nChime Power Off");
+      }
+    }
+  }
+
+  // Waking up
+  else if (power_state == sleep_to_awake_transition)
+  {
+    // Turn on power supply (it needs to stabilize)
+    ps_enabled = true;
+
+    // Raise backlight & wait for PS to stabilize
+    if (sleep_timer >= 1)
+    {
+      sleep_timer -= 1;
+      if (!backlight_up())
+      {
+        // We are maxed out, so we are fully awake
+        wake_complete();
+      }
+    }
+  }
+}
+
+bool backlight_up()
+{
+  // Are we at the limit?
+  if (backlight_pwm == lcd_bl_pwm_max)
+  {
+    return false;
+  }
+
+  // Range-check new value
+  uint32_t new_val(static_cast<uint32_t>(backlight_pwm) + lcd_bl_pwm_step);
+  if (new_val >= static_cast<uint32_t>(lcd_bl_pwm_max))
+  {
+    backlight_pwm = lcd_bl_pwm_max;
+  }
+  else
+  {
+    backlight_pwm = new_val;
+  }
+  analogWrite(lcd_backlight_pin, backlight_pwm);
+  return true;
+}
+bool backlight_down()
+{
+  // Are we at the limit?
+  if (backlight_pwm == lcd_bl_pwm_min)
+  {
+    return false;
+  }
+
+  // Range-check new value
+  uint16_t new_val(backlight_pwm - lcd_bl_pwm_step);
+  if (lcd_bl_pwm_step >= backlight_pwm)
+  {
+    // Would have gone below 0 on an unsigned number!
+    new_val = 0;
+  }
+  if (new_val <= lcd_bl_pwm_min)
+  {
+    backlight_pwm = lcd_bl_pwm_min;
+  }
+  else
+  {
+    backlight_pwm = new_val;
+  }
+  analogWrite(lcd_backlight_pin, backlight_pwm);
+  return true;
+}
+
+void begin_sleep()
+{
+  // Transition to sleep
+  power_state = awake_to_sleep_transition;
+  sleep_timer = 0;
+
+  // Disable power supply
+  ps_enabled = false;
+
+  // Show sleep window
+  UG_TextboxSetText(&sleep_window, TXB_ID_1, "Sleeping...");
+  UG_WindowShow(&sleep_window);
+}
+void begin_wake()
+{
+  // Transition to wake
+  power_state = sleep_to_awake_transition;
+  sleep_timer = 0;
+
+  // Enable power supply
+  ps_enabled = true;
+
+  // Update sleep window
+  UG_TextboxSetText(&sleep_window, TXB_ID_1, "Waking Up\nPower Supply\nStabilizing...");
+}
+void wake_complete()
+{
+  // We are now fully awake
+  power_state = awake;
+  sleep_timer = 0;
+
+  // Return to main window
+  UG_WindowHide(&sleep_window);
+  UG_WindowShow(&main_window);
+}
+
 void UserPixelSetFunction(UG_S16 x, UG_S16 y, UG_COLOR c)
 {
   tft.drawPixel(x, y, c);
@@ -1118,13 +1316,11 @@ void settings_callback(UG_MESSAGE* msg)
     switch (msg->sub_id)
     {
     case BTN_ID_0: // settings_ps_on_button
-      ps_enabled = true;
       UG_ButtonSetBackColor(&settings_window, BTN_ID_0, selected_color);
       UG_ButtonSetBackColor(&settings_window, BTN_ID_1, UG_WindowGetBackColor(&settings_window));
       break;
 
     case BTN_ID_1: // settings_ps_off_button
-      ps_enabled = false;
       UG_ButtonSetBackColor(&settings_window, BTN_ID_0, UG_WindowGetBackColor(&settings_window));
       UG_ButtonSetBackColor(&settings_window, BTN_ID_1, selected_color);
       break;
@@ -1302,3 +1498,32 @@ void fb_draw_highlight(int16_t selected_line)
   sprintf(selected_file_buffer, "sel: %d", fb_selected_line); 
   UG_TextboxSetText(&fb_window, (FB_LIST_SIZE+1), selected_file_buffer);
 }
+
+void draw_sleep_window()
+{
+  // Window layout
+  UG_WindowCreate(&sleep_window, obj_buff_sleep_window, sizeof(obj_buff_sleep_window) / sizeof(*obj_buff_sleep_window), sleep_callback);
+  UG_WindowResize(&sleep_window, 49, 49, 319-50, 239-50);
+  UG_WindowSetTitleTextAlignment(&sleep_window, ALIGN_CENTER);
+  UG_WindowSetTitleText(&sleep_window, "Power Saving");
+  UG_WindowSetBackColor(&sleep_window, C_FOREST_GREEN);
+  UG_WindowSetForeColor(&sleep_window, C_WHITE);
+
+  // UI layout variables
+  const uint16_t width(UG_WindowGetInnerWidth(&sleep_window));
+  const uint16_t height(UG_WindowGetInnerHeight(&sleep_window));
+
+  // Sleep icon
+  UG_TextboxCreate(&sleep_window, &sleep_icon, TXB_ID_0, 0, 0, width, 50);
+  UG_TextboxSetFont(&sleep_window, TXB_ID_0, &font_FontAwesome_mod_50X40);
+  UG_TextboxSetAlignment(&sleep_window, TXB_ID_0, ALIGN_CENTER);
+  UG_TextboxSetText(&sleep_window, TXB_ID_0, fa_icon_sleep_leaf);
+
+  // Sleep text
+  UG_TextboxCreate(&sleep_window, &sleep_text, TXB_ID_1, 0, 50, width, height);
+  UG_TextboxSetFont(&sleep_window, TXB_ID_1, &FONT_12X20);
+  UG_TextboxSetAlignment(&sleep_window, TXB_ID_1, ALIGN_CENTER);
+}
+
+void sleep_callback(UG_MESSAGE* msg)
+{}
