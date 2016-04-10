@@ -61,7 +61,6 @@
 #include <i2c_t3.h>
 #include <ILI9341_t3.h>
 #include <SdFat.h>
-#include <IniFile.h>
 
 // GUI
 extern "C"
@@ -94,6 +93,9 @@ using namespace midi_chimes;
 // I2C config
 const uint8_t i2c_slave_base_address(0x10); // Starting address for slaves
 const uint8_t i2c_slave_ack(0x06); // ACK sentinel expected from the slaves
+
+// Settings file
+const char ini_filename[] = "/Settings.ini";
 
 // Note map (loaded from config file)
 // MIDI spec only allows a maximum of 128 notes, so we will just build a map of
@@ -227,6 +229,7 @@ void fb_draw_highlight(int16_t line);
 // -----------------------------------------------------------------------------
 
 // User settings
+config_file settings = config_file(ini_filename); // Hardware settings
 uint8_t our_channel(0); // Current channel (0-15)
 int8_t master_volume(100); // Master volume (0-100, 0 means mute, steps of 10)
 bool override_velocity(false); // Override velocity to master volume (true), or scale it by master volume (false)
@@ -302,45 +305,6 @@ UG_OBJECT obj_buff_settings_window[6];
 // Function Definitions
 // -----------------------------------------------------------------------------
 
-// TEMP
-void printErrorMessage(uint8_t e, bool eol = true)
-{
-  switch (e) {
-  case IniFile::errorNoError:
-    tft.print("no error");
-    break;
-  case IniFile::errorFileNotFound:
-    tft.print("file not found");
-    break;
-  case IniFile::errorFileNotOpen:
-    tft.print("file not open");
-    break;
-  case IniFile::errorBufferTooSmall:
-    tft.print("buffer too small");
-    break;
-  case IniFile::errorSeekError:
-    tft.print("seek error");
-    break;
-  case IniFile::errorSectionNotFound:
-    tft.print("section not found");
-    break;
-  case IniFile::errorKeyNotFound:
-    tft.print("key not found");
-    break;
-  case IniFile::errorEndOfFile:
-    tft.print("end of file");
-    break;
-  case IniFile::errorUnknownError:
-    tft.print("unknown error");
-    break;
-  default:
-    tft.print("unknown error value");
-    break;
-  }
-  if (eol)
-    tft.println();
-}
-
 // Initial setup routine
 void setup()
 {
@@ -404,97 +368,79 @@ void setup()
   }
   UG_ConsolePutString("done.\n");
 
-  // TEMP: hard code some config
-  note_map[55].slave_address = i2c_slave_base_address + 0;
-  note_map[55].channel = 0;
-  note_map[56].slave_address = i2c_slave_base_address + 0;
-  note_map[56].channel = 1;
-  note_map[57].slave_address = i2c_slave_base_address + 0;
-  note_map[57].channel = 2;
-  note_map[58].slave_address = i2c_slave_base_address + 0;
-  note_map[58].channel = 3;
-  note_map[59].slave_address = i2c_slave_base_address + 0;
-  note_map[59].channel = 4;
-  note_map[60].slave_address = i2c_slave_base_address + 0;
-  note_map[60].channel = 5;
-  note_map[61].slave_address = i2c_slave_base_address + 0;
-  note_map[61].channel = 6;
-  note_map[62].slave_address = i2c_slave_base_address + 0;
-  note_map[62].channel = 7;
-  note_map[63].slave_address = i2c_slave_base_address + 0;
-  note_map[63].channel = 8;
-  note_map[64].slave_address = i2c_slave_base_address + 0;
-  note_map[64].channel = 9;
-  note_map[65].slave_address = i2c_slave_base_address + 1;
-  note_map[65].channel = 0;
-  note_map[66].slave_address = i2c_slave_base_address + 1;
-  note_map[66].channel = 1;
-  note_map[67].slave_address = i2c_slave_base_address + 1;
-  note_map[67].channel = 2;
-  note_map[68].slave_address = i2c_slave_base_address + 1;
-  note_map[68].channel = 3;
-  note_map[69].slave_address = i2c_slave_base_address + 1;
-  note_map[69].channel = 4;
-  note_map[70].slave_address = i2c_slave_base_address + 1;
-  note_map[70].channel = 5;
-  note_map[71].slave_address = i2c_slave_base_address + 1;
-  note_map[71].channel = 6;
-  note_map[72].slave_address = i2c_slave_base_address + 1;
-  note_map[72].channel = 7;
-  note_map[73].slave_address = i2c_slave_base_address + 1;
-  note_map[73].channel = 8;
-  note_map[74].slave_address = i2c_slave_base_address + 1;
-  note_map[74].channel = 9;
-  note_map[75].slave_address = i2c_slave_base_address + 2;
-  note_map[75].channel = 0;
-  note_map[76].slave_address = i2c_slave_base_address + 2;
-  note_map[76].channel = 1;
-  note_map[77].slave_address = i2c_slave_base_address + 2;
-  note_map[77].channel = 2;
-  note_map[78].slave_address = i2c_slave_base_address + 2;
-  note_map[78].channel = 3;
-  note_map[79].slave_address = i2c_slave_base_address + 2;
-  note_map[79].channel = 4;
-
-  // TODO: read config file
-
-  // TESTING BEGIN
-  const char *filename = "/Settings.ini";
-  IniFile ini(filename);
-  if (!ini.open()) {
+  // Read config file
+  UG_ConsolePutString("Opening Settings.ini...");
+  if (!settings.open())
+  {
     draw_BSOD(tft);
-    tft.print("Ini file ");
-    tft.print(filename);
-    tft.println(" does not exist");
-    // Cannot do anything else
+    tft.print("Could not open INI file ");
+    tft.println(ini_filename);
     halt_system();
   }
-
-  // Check the file is valid. This can be used to warn if any lines
-  // are longer than the buffer.
-  const size_t bufferLen = 84;
-  char buffer[bufferLen];
-  if (!ini.validate(buffer, bufferLen)) {
+  if (!settings.validate())
+  {
     draw_BSOD(tft);
-    tft.print("ini file ");
-    tft.print(ini.getFilename());
+    tft.print("INI file ");
+    tft.print(ini_filename);
     tft.print(" not valid: ");
-    printErrorMessage(ini.getError());
-    // Cannot do anything else
+    settings.print_ini_error_message(tft);
     halt_system();
   }
-  // TESTING END
+  UG_ConsolePutString("done.\n");
+
+  // Load configuration
+  UG_ConsolePutString("Loading settings...");
+  // How many slaves should we have?
+  int8_t slaves_expected(0);
+  if (!settings.get_slave_count(slaves_expected))
+  {
+    draw_BSOD(tft);
+    tft.println("Could not find any slave configuration lines!");
+    tft.println("Please verify the INI file.");
+    halt_system();
+  }
+  // Load note map
+  for (int8_t slave(0); slave < slaves_expected; ++slave)
+  {
+    int8_t notes[notes_per_slave];
+    if (!settings.get_slave_notes(slave, notes))
+    {
+      draw_BSOD(tft);
+      tft.print("Unable to process slave note settings for Slave");
+      tft.print(slave);
+      tft.println(".");
+      tft.println("Verify note assignments in the INI file.");
+      halt_system();
+    }
+    for (uint8_t channel(0); channel < notes_per_slave; ++channel)
+    {
+      const int8_t note(notes[channel]);
+      if (note == -1)
+      {
+        // Nothing on this channel
+        continue;
+      }
+      note_map[note].slave_address = i2c_slave_base_address + slave;
+      note_map[note].channel = channel;
+    }
+  }
+  // TODO: load calibration?
+  UG_ConsolePutString("done.\n");
 
   // Configure slave addresses
   UG_ConsolePutString("Detecting slave boards...");
   const uint8_t slaves_found(i2c_addr_auto_assign());
-  if (slaves_found == 0)
-  // TODO: compare with the expected slaves configuration in config file
+  if (slaves_found != slaves_expected)
   {
     draw_BSOD(tft);
-    tft.println("No slave boards found!");
+    tft.println("Incorrect number of slave boards found!");
+    tft.print("Expected: ");
+    tft.println(slaves_expected);
+    tft.print("Found:    ");
+    tft.println(slaves_found);
     tft.println();
     tft.println("Check the cables are attached & oriented correctly.");
+    tft.println("Check the INI file has the correct settings.");
     tft.println("Remove all power before retrying.");
     // halt_system();
     // ^^^ TODO: disabled for debug, re-enable when I have all the slaves
