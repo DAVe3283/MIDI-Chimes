@@ -50,7 +50,7 @@
 // -----------------------------------------------------------------------------
 
 // Comment this line out if using the resistive touchscreen layer
-#define CAPACITIVE_TS
+//#define CAPACITIVE_TS
 
 // -----------------------------------------------------------------------------
 // Includes
@@ -81,6 +81,11 @@ extern "C"
 // Blue Screen of Death :P
 #include "bsod_win10.h"
 
+// Config file
+#include "config_file.h"
+
+using namespace midi_chimes;
+
 // -----------------------------------------------------------------------------
 // Constants
 // -----------------------------------------------------------------------------
@@ -88,35 +93,12 @@ extern "C"
 // I2C config
 const uint8_t i2c_slave_base_address(0x10); // Starting address for slaves
 const uint8_t i2c_slave_ack(0x06); // ACK sentinel expected from the slaves
-const uint8_t slave_addresses[] =
-{
-  0x10, // Slave 0
-  0x11, // Slave 1
-  0x12, // Slave 2
-};
-const size_t num_slaves(sizeof(slave_addresses)/sizeof(*slave_addresses));
-// TODO: the number of slaves and the note mapping will be read from the config file
 
-// Note mapping
+// Note map (loaded from config file)
+// MIDI spec only allows a maximum of 128 notes, so we will just build a map of
+// all possibilities
+slave_note_map note_map[128] = {};
 const size_t notes_per_slave(10);
-// WARNING: make sure this table is big enough!
-const uint8_t note_map[num_slaves][notes_per_slave] =
-{
-  // Slave 0
-  // G3  G3# A3  A3# B3  C4  C4# D4  D4# E4
-  {  55, 56, 57, 58, 59, 60, 61, 62, 63, 64 },
-
-  // Slave 1
-  // F4  F4# G4  G4# A4  A4# B4  C5  C5# D5
-  {  65, 66, 67, 68, 69, 70, 71, 72, 73, 74 },
-
-  // Slave 2
-  // D5# E5  F5  F5# G5  <--- Not Used --->
-  {  75, 76, 77, 78, 79,  0,  0,  0,  0,  0 },
-};
-// TODO: convert this from a reverse-lookup table to a lookup table.
-// It won't be as easy to read, but it will be faster. Or do we need the speed?
-// TODO: use real data once the chimes are hooked up
 
 // Duty Cycle Settings
 // This matches the slaves, and isn't directly used by the master
@@ -381,6 +363,58 @@ void setup()
     sd.initErrorHalt(&tft);
   }
   UG_ConsolePutString("done.\n");
+
+  // TEMP: hard code some config
+  note_map[55].slave_address = i2c_slave_base_address + 0;
+  note_map[55].channel = 0;
+  note_map[56].slave_address = i2c_slave_base_address + 0;
+  note_map[56].channel = 1;
+  note_map[57].slave_address = i2c_slave_base_address + 0;
+  note_map[57].channel = 2;
+  note_map[58].slave_address = i2c_slave_base_address + 0;
+  note_map[58].channel = 3;
+  note_map[59].slave_address = i2c_slave_base_address + 0;
+  note_map[59].channel = 4;
+  note_map[60].slave_address = i2c_slave_base_address + 0;
+  note_map[60].channel = 5;
+  note_map[61].slave_address = i2c_slave_base_address + 0;
+  note_map[61].channel = 6;
+  note_map[62].slave_address = i2c_slave_base_address + 0;
+  note_map[62].channel = 7;
+  note_map[63].slave_address = i2c_slave_base_address + 0;
+  note_map[63].channel = 8;
+  note_map[64].slave_address = i2c_slave_base_address + 0;
+  note_map[64].channel = 9;
+  note_map[65].slave_address = i2c_slave_base_address + 1;
+  note_map[65].channel = 0;
+  note_map[66].slave_address = i2c_slave_base_address + 1;
+  note_map[66].channel = 1;
+  note_map[67].slave_address = i2c_slave_base_address + 1;
+  note_map[67].channel = 2;
+  note_map[68].slave_address = i2c_slave_base_address + 1;
+  note_map[68].channel = 3;
+  note_map[69].slave_address = i2c_slave_base_address + 1;
+  note_map[69].channel = 4;
+  note_map[70].slave_address = i2c_slave_base_address + 1;
+  note_map[70].channel = 5;
+  note_map[71].slave_address = i2c_slave_base_address + 1;
+  note_map[71].channel = 6;
+  note_map[72].slave_address = i2c_slave_base_address + 1;
+  note_map[72].channel = 7;
+  note_map[73].slave_address = i2c_slave_base_address + 1;
+  note_map[73].channel = 8;
+  note_map[74].slave_address = i2c_slave_base_address + 1;
+  note_map[74].channel = 9;
+  note_map[75].slave_address = i2c_slave_base_address + 2;
+  note_map[75].channel = 0;
+  note_map[76].slave_address = i2c_slave_base_address + 2;
+  note_map[76].channel = 1;
+  note_map[77].slave_address = i2c_slave_base_address + 2;
+  note_map[77].channel = 2;
+  note_map[78].slave_address = i2c_slave_base_address + 2;
+  note_map[78].channel = 3;
+  note_map[79].slave_address = i2c_slave_base_address + 2;
+  note_map[79].channel = 4;
 
   // TODO: read config file
 
@@ -750,19 +784,18 @@ void send_chime(const uint8_t& address, const uint8_t& channel, const uint16_t& 
 
 bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out, uint8_t& slave_channel_out)
 {
-  for (uint8_t slave(0); slave < num_slaves; ++slave)
+  // Sanity check input
+  if (midi_note > (sizeof(note_map) / sizeof(note_map[0])))
   {
-    for (uint8_t channel(0); channel < notes_per_slave; ++channel)
-    {
-      if (note_map[slave][channel] == midi_note)
-      {
-        slave_address_out = slave_addresses[slave];
-        slave_channel_out = channel;
-        return true;
-      }
-    }
+    return false;
   }
-  return false;
+
+  // Lookup values
+  slave_address_out = note_map[midi_note].slave_address;
+  slave_channel_out = note_map[midi_note].channel;
+
+  // Valid if slave address is non-zero
+  return (slave_address_out != 0);
 }
 
 // Change the master volume by the amount specified
