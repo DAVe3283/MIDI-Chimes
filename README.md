@@ -27,9 +27,15 @@ I am using the following libraries:
 * [Adafruit_STMPE610][] - STMPE610 SPI touch screen controller library.
 * [Adafruit_FT6206][] - FT6206 I2C touch screen controller library.
 * [SdFat][] - SD Card + FAT file system library.
+* [IniFile][] - Arduino library to parse INI files.
 
-The Adafruit_STMPE610 library needs `#include <Wire.h>` changed to
-`#include <i2c_t3.h>` or it conflicts with the i2c_t3 library.
+Some minor changes are needed to make the libraries work together for this
+project.
+
+#### Adafruit_STMPE610
+
+The line `#include <Wire.h>` needs changed to `#include <i2c_t3.h>` or it
+conflicts with the i2c_t3 library.
 
 #### SdFat
 
@@ -48,6 +54,18 @@ much nicer.
 I had some issues with SdFat-beta, but I might go back and make that work,
 because it does some cool stuff.
 
+#### IniFile
+
+In IniFile.h, `#include <SD.h>` needs changed to `#include <SdFat.h>`.
+
+Immediately below the includes, add the following so the inline code works with
+this program:
+
+```c++
+extern SdFat sd;
+#define SD sd
+```
+
 ## Schematics
 
 See the "PCB & Schematic" directory, and the [PCB.md](Notes/PCB.md) file.
@@ -65,3 +83,4 @@ for reference only, and are subject to all licenses/copyright specified within.
 [ILI9341_fonts]: https://github.com/PaulStoffregen/ILI9341_fonts
 [ILI9341_t3]: https://github.com/PaulStoffregen/ILI9341_t3
 [SdFat]: https://github.com/greiman/SdFat
+[IniFile]: https://github.com/stevemarple/IniFile

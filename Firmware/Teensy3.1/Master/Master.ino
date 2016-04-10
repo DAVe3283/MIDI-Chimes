@@ -61,6 +61,7 @@
 #include <i2c_t3.h>
 #include <ILI9341_t3.h>
 #include <SdFat.h>
+#include <IniFile.h>
 
 // GUI
 extern "C"
@@ -301,6 +302,45 @@ UG_OBJECT obj_buff_settings_window[6];
 // Function Definitions
 // -----------------------------------------------------------------------------
 
+// TEMP
+void printErrorMessage(uint8_t e, bool eol = true)
+{
+  switch (e) {
+  case IniFile::errorNoError:
+    tft.print("no error");
+    break;
+  case IniFile::errorFileNotFound:
+    tft.print("file not found");
+    break;
+  case IniFile::errorFileNotOpen:
+    tft.print("file not open");
+    break;
+  case IniFile::errorBufferTooSmall:
+    tft.print("buffer too small");
+    break;
+  case IniFile::errorSeekError:
+    tft.print("seek error");
+    break;
+  case IniFile::errorSectionNotFound:
+    tft.print("section not found");
+    break;
+  case IniFile::errorKeyNotFound:
+    tft.print("key not found");
+    break;
+  case IniFile::errorEndOfFile:
+    tft.print("end of file");
+    break;
+  case IniFile::errorUnknownError:
+    tft.print("unknown error");
+    break;
+  default:
+    tft.print("unknown error value");
+    break;
+  }
+  if (eol)
+    tft.println();
+}
+
 // Initial setup routine
 void setup()
 {
@@ -417,6 +457,33 @@ void setup()
   note_map[79].channel = 4;
 
   // TODO: read config file
+
+  // TESTING BEGIN
+  const char *filename = "/Settings.ini";
+  IniFile ini(filename);
+  if (!ini.open()) {
+    draw_BSOD(tft);
+    tft.print("Ini file ");
+    tft.print(filename);
+    tft.println(" does not exist");
+    // Cannot do anything else
+    halt_system();
+  }
+
+  // Check the file is valid. This can be used to warn if any lines
+  // are longer than the buffer.
+  const size_t bufferLen = 84;
+  char buffer[bufferLen];
+  if (!ini.validate(buffer, bufferLen)) {
+    draw_BSOD(tft);
+    tft.print("ini file ");
+    tft.print(ini.getFilename());
+    tft.print(" not valid: ");
+    printErrorMessage(ini.getError());
+    // Cannot do anything else
+    halt_system();
+  }
+  // TESTING END
 
   // Configure slave addresses
   UG_ConsolePutString("Detecting slave boards...");
