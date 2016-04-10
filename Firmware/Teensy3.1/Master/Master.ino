@@ -188,8 +188,7 @@ void OnProgramChange(uint8_t channel, uint8_t program);
 // void OnPitchChange(uint8_t channel, int pitch);
 
 // Scale a MIDI velocity (7-bit) to our 12-bit velocity
-// TODO: calibrate for linear sound output, calibrate per chime, etc.
-uint16_t scale_midi_velocity(const uint8_t& midi_velocity);
+uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note);
 
 // Send a chime strike command to a slave
 void send_chime(const uint8_t& address, const uint8_t& channel, const uint16_t& velocity);
@@ -422,9 +421,14 @@ void setup()
       }
       note_map[note].slave_address = i2c_slave_base_address + slave;
       note_map[note].channel = channel;
+      // Load calibration
+      float calibration;
+      if (settings.get_note_calibration(note, calibration))
+      {
+        note_map[note].calibration = calibration;
+      }
     }
   }
-  // TODO: load calibration?
   UG_ConsolePutString("done.\n");
 
   // Configure slave addresses
@@ -743,7 +747,7 @@ void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
     if (get_slave_and_channel(note, slave_address, slave_channel))
     {
       digitalWrite(led_pin, HIGH); // diagnostics
-      send_chime(slave_address, slave_channel, scale_midi_velocity(velocity));
+      send_chime(slave_address, slave_channel, scale_midi_velocity(velocity, note));
       digitalWrite(led_pin, LOW); // diagnostics
     }
   }
@@ -765,20 +769,29 @@ void OnProgramChange(uint8_t channel, uint8_t program)
   }
 }
 
-uint16_t scale_midi_velocity(const uint8_t& midi_velocity)
+uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note)
 {
-  // TODO: take master volume (& override) into account
-  // TODO: scale MIDI velocity to chime volume somehow
-
   // Don't worry about MIDI velocity == 0, that must be taken care of before we
   // try and send a message at all.
 
-  // For now, just linearly scaling chime velocity between minimum_dc and
-  // maximum_dc.
+  // TODO: it might be worth re-working all the math as int32, as it might be
+  //       faster than floats. But it might not matter.
 
-  const float requested_velocity(static_cast<float>(midi_velocity & 0x7F) / 127.0);
+  // Calculate requested velocity
   const float range(maximum_dc - minimum_dc);
-  const uint16_t velocity((range * requested_velocity) + minimum_dc);
+  float requested_volume(static_cast<float>(midi_velocity & 0x7F) / 127.0);
+
+  // If we are overriding velocity, use the current volume level
+  if (override_velocity)
+  {
+    requested_volume = static_cast<float>(master_volume) / 100.0;
+  }
+
+  // Handle calibration
+  const float& calibration(note_map[note].calibration);
+
+  // Calculate final velocity DC value
+  const uint16_t velocity(minimum_dc + (range * requested_volume * calibration));
   return velocity;
 }
 

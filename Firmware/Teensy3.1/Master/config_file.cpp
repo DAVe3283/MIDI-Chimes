@@ -3,9 +3,29 @@
 namespace midi_chimes
 {
 
+// Setting file section names
+const char note_section[] = "Notes";
+const char calibration_section[] = "Calibration";
+
 // Local file globals
 const char split_tokens[] = " ,";
 char slave_key_buffer[] = "Slave12";
+
+// Note name to number map
+const char* note_names[128] =
+{
+    "C-1","C#-1","D-1","D#-1","E-1","F-1","F#-1","G-1","G#-1","A-1","A#-1","B-1",
+    "C0", "C#0", "D0", "D#0", "E0", "F0", "F#0", "G0", "G#0", "A0", "A#0", "B0",
+    "C1", "C#1", "D1", "D#1", "E1", "F1", "F#1", "G1", "G#1", "A1", "A#1", "B1",
+    "C2", "C#2", "D2", "D#2", "E2", "F2", "F#2", "G2", "G#2", "A2", "A#2", "B2",
+    "C3", "C#3", "D3", "D#3", "E3", "F3", "F#3", "G3", "G#3", "A3", "A#3", "B3",
+    "C4", "C#4", "D4", "D#4", "E4", "F4", "F#4", "G4", "G#4", "A4", "A#4", "B4",
+    "C5", "C#5", "D5", "D#5", "E5", "F5", "F#5", "G5", "G#5", "A5", "A#5", "B5",
+    "C6", "C#6", "D6", "D#6", "E6", "F6", "F#6", "G6", "G#6", "A6", "A#6", "B6",
+    "C7", "C#7", "D7", "D#7", "E7", "F7", "F#7", "G7", "G#7", "A7", "A#7", "B7",
+    "C8", "C#8", "D8", "D#8", "E8", "F8", "F#8", "G8", "G#8", "A8", "A#8", "B8",
+    "C9", "C#9", "D9", "D#9", "E9", "F9", "F#9", "G9",
+};
 
 config_file::config_file(const char* filename)
     : ini(filename)
@@ -31,7 +51,7 @@ bool config_file::get_slave_count(int8_t& slave_count)
     for (int slave = 0; slave < max_slaves; ++slave)
     {
         sprintf(slave_key_buffer + 5, "%d", slave);
-        if (ini.getValue("Slaves", slave_key_buffer, ini_buffer, ini_buffer_len))
+        if (ini.getValue(note_section, slave_key_buffer, ini_buffer, ini_buffer_len))
         {
             slave_count++;
         }
@@ -50,7 +70,7 @@ bool config_file::get_slave_notes(const int8_t& slave_no, int8_t notes[10])
     sprintf(slave_key_buffer + 5, "%d", slave_no);
 
     // Get INI setting value
-    if (!ini.getValue("Slaves", slave_key_buffer, ini_buffer, ini_buffer_len))
+    if (!ini.getValue(note_section, slave_key_buffer, ini_buffer, ini_buffer_len))
     {
         return false;
     }
@@ -76,6 +96,33 @@ bool config_file::get_slave_notes(const int8_t& slave_no, int8_t notes[10])
 
     // Success!
     return true;
+}
+
+bool config_file::get_note_calibration(const int8_t& note, float& calibration)
+{
+    // Try and lookup by note number
+    char buffer[5];
+    sprintf(buffer, "%d", note);
+    if (ini.getValue(calibration_section, buffer, ini_buffer, ini_buffer_len))
+    {
+        // Parse the value
+        return parse_percentage(ini_buffer, calibration);
+    }
+
+    // Try and lookup by note name
+    const char* note_name(lookup_note_name(note));
+    if (!note_name)
+    {
+        return false;
+    }
+    if (ini.getValue(calibration_section, note_name, ini_buffer, ini_buffer_len))
+    {
+        // Parse the value
+        return parse_percentage(ini_buffer, calibration);
+    }
+
+    // Couldn't find a calibration
+    return false;
 }
 
 void config_file::print_ini_error_message(Print& display, const uint8_t& errNo, bool eol)
@@ -205,6 +252,42 @@ int8_t config_file::parse_note(const char* note)
     }
 }
 
+const char* config_file::lookup_note_name(const int8_t& note)
+{
+    if (note < 0)
+    {
+        return NULL;
+    }
+    return note_names[note];
+}
+
+bool config_file::parse_percentage(char* str, float& percentage)
+{
+    // Validate string
+    size_t len(0);
+    while (str[len] != 0)
+    {
+        // Remove % symbol
+        if (str[len] == '%')
+        {
+            str[len++] = 0;
+            break;
+        }
+
+        // Fail on non-number characters
+        if (!is_number(str[len]) &&
+            (str[len] != '.'))
+        {
+            return false;
+        }
+        len++;
+    }
+
+    // Parse string
+    percentage = atof(str) / 100.0;
+    return true;
+}
+
 bool config_file::is_number(const char* str)
 {
     if ((str[0] == '+') ||
@@ -212,7 +295,7 @@ bool config_file::is_number(const char* str)
     {
         str++;
     }
-    size_t len(strlen(str));
+    const size_t len(strlen(str));
     for (size_t i(0); i < len; ++i)
     {
         if (!is_number(str[i]))
