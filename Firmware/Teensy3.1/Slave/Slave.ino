@@ -67,8 +67,9 @@ const uint8_t feedback_pins[num_channels] =
 const uint32_t strike_time( 90); // milliseconds
 const uint32_t settle_time(155); // milliseconds
 const uint32_t blink_time(  20); // milliseconds
-const uint32_t ps_stable_time(2500000); // microseconds
-const uint32_t ps_toggle_time(   3000); // microseconds
+// Power supply timeouts
+const uint32_t ps_stable_time(2500); // milliseconds, datasheet spec for power supply
+const uint32_t ps_toggle_time( 100); // milliseconds, datasheet spec for watchdog
 
 // PWM Config
 const uint8_t pwm_bits(12);
@@ -166,7 +167,7 @@ volatile bool i2c_ready(false); // Only goes true once we have completed address
 elapsedMillis cooldown_timer;
 elapsedMillis strike_timer[num_channels];
 elapsedMillis message_blink_timer;
-elapsedMicros ps_stable_timer;
+elapsedMillis ps_stable_timer;
 
 // USB Debug
 usb_serial_class usb = usb_serial_class();
@@ -590,10 +591,7 @@ void ps_en_isr()
   }
 
   // We handled an edge, so the timer resets no matter what
-  ps_stable_timer = 16;
-  // TODO: figure out why time goes backwards later in the program
-  // When time goes backwards, ps_stable_timer goes to -3(ish) (as a uint32_t),
-  // which causes all sorts of grief.
+  ps_stable_timer = 0;
 }
 
 void ps_state_update()
@@ -602,8 +600,6 @@ void ps_state_update()
   noInterrupts();
 
   // Have we missed any edges?
-  // const uint32_t timer_val(ps_stable_timer);
-  // const bool missed_edge(timer_val > ps_toggle_time);
   if (ps_stable_timer > ps_toggle_time)
   {
     // Mark power supply as disabled, we missed an edge
@@ -612,14 +608,7 @@ void ps_state_update()
       ps_state = disabled;
       if (debug)
       {
-        usb.println("Power supply appears disabled.");
-        // usb.print("It has been ");
-        // usb.print(ps_stable_timer);
-        // usb.print(" us (was ");
-        // usb.print(timer_val);
-        // usb.print(" us), and ps_stable_timer > ps_toggle time = ");
-        // usb.print(static_cast<int>(missed_edge));
-        // usb.println(".");
+        usb.println("Watchdog timeout exceeded, assuming power supply is disabled.");
       }
     }
     ps_stable_timer = 0;
