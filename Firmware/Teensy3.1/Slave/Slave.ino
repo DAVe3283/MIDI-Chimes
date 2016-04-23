@@ -599,7 +599,8 @@ void ps_state_update()
   noInterrupts();
 
   // Have we missed any edges?
-  if (ps_stable_timer > ps_toggle_time)
+  const bool missed_edge(ps_stable_timer > ps_toggle_time);
+  if (missed_edge)
   {
     // Mark power supply as disabled, we missed an edge
     if (ps_state != disabled)
@@ -611,7 +612,7 @@ void ps_state_update()
         usb.print("It has been ");
         usb.print(ps_stable_timer);
         usb.print(" us, and ps_stable_timer > ps_toggle time = ");
-        usb.print(static_cast<int>(ps_stable_timer > ps_toggle_time));
+        usb.print(static_cast<int>(missed_edge));
         usb.println(".");
       }
     }
