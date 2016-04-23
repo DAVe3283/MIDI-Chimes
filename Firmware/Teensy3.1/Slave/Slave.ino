@@ -6,18 +6,14 @@
 // from overheating.
 //
 // TODO:
-// * Handle address auto-assignment on startup
-// * It looks like interrupts can fire inside setup()...
-//   * I should probably attach the I2C ISRs at the end then.
-// * wait for power supply to get enabled at startup, then settle, then measure channels
-//   * Should this be part of the startup sequence before allowing normal operation?
-// * periodically check if the power supply is enabled
+// * periodically check if the power supply is enabled/stable
 //   * if not, don't mark channels as shorted/open.
-//   * Probably just don't run the strike routine at all, so the verification never happens
-// * if a channel becomes shorted, turn off the master power supply
+//   * still attempt a strike, so we don't lose as many notes during PS startup
 // * Should I implement some sort of cumulative current limit to protect the PCB?
 //   If each coil is 2A, and all 10 are told to fire, that's 20A through the PCB traces...
 //   Now imagine if they are 10A each O_o
+// * Remove a lot of debug code, and/or at least make sure USB debug is enabled
+// * Add version information printout and help to USB debug
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
@@ -68,9 +64,11 @@ const uint8_t feedback_pins[num_channels] =
 };
 
 // Timeouts
-const uint16_t strike_time( 90); // milliseconds
-const uint16_t settle_time(160); // milliseconds
-const uint16_t blink_time(  20); // milliseconds
+const uint32_t strike_time( 90); // milliseconds
+const uint32_t settle_time(155); // milliseconds
+const uint32_t blink_time(  20); // milliseconds
+const uint32_t ps_stable_time(2500000); // microseconds
+const uint32_t ps_toggle_time(   3000); // microseconds
 
 // PWM Config
 const uint8_t pwm_bits(12);
@@ -125,6 +123,10 @@ void i2c_startup(size_t numBytes);
 void i2c_receive(size_t numBytes);
 void i2c_startup_ack();
 void i2c_status_requested();
+void ps_en_isr();
+
+// Update power supply state
+void ps_state_update();
 
 // I2C address auto-assignment procedure
 void i2c_addr_auto_assign();
@@ -164,6 +166,7 @@ volatile bool i2c_ready(false); // Only goes true once we have completed address
 elapsedMillis cooldown_timer;
 elapsedMillis strike_timer[num_channels];
 elapsedMillis message_blink_timer;
+elapsedMicros ps_stable_timer;
 
 // USB Debug
 usb_serial_class usb = usb_serial_class();
@@ -182,14 +185,21 @@ volatile bool verified[num_channels];
 volatile int8_t strikes_remaining[num_channels];
 
 // Power supply measurements
-//bool ps_enabled(false); // Is the power supply currently enabled?
+enum ps_state_t
+{
+  stable, // has been on for at least ps_stable_time
+  stabilizing, // has just turned on
+  disabled, // appears to be disabled
+};
+volatile ps_state_t ps_state(disabled); // Current power supply state
+volatile uint32_t ps_stabilize_time(0); // How long the power supply has been stabilizing (microseconds)
 float ps_voltage[num_channels]; // Last measured voltage
 float ps_setpoint(0); // Guess power supply setpoint (max measured voltage at startup)
 
 // Channel diagnostics
 channel_state_t channel_state[num_channels];
 uint8_t num_connected_channels(0);
-bool any_shorted(false); // Are any channels shorted?
+volatile bool any_shorted(false); // Are any channels shorted?
 
 
 // -----------------------------------------------------------------------------
@@ -203,9 +213,6 @@ void setup()
   pinMode(addr_latch_i_pin, INPUT);
   pinMode(addr_latch_o_pin, OUTPUT);
   digitalWrite(addr_latch_o_pin, LOW);
-
-  // High-Z the PS_Enable pin
-  pinMode(ps_enable_pin, INPUT);
 
   // Configure LED
   pinMode(led_pin, OUTPUT);
@@ -229,9 +236,19 @@ void setup()
   // Diagnostics
   usb.begin(9600);
 
+  // Attach PS_EN interrupt
+  pinMode(ps_enable_pin, INPUT);
+  attachInterrupt(digitalPinToInterrupt(ps_enable_pin), ps_en_isr, RISING);
+
   // I2C address auto-config
   i2c_addr_auto_assign();
-  // Master won't release us to continue until the power supply is stable
+
+  // Wait for power supply to stabilize
+  // while (ps_state != stable)
+  // {
+  //   ps_state_update();
+  //   yield();
+  // }
 
   // Measure power supply voltages at boot, look for connected channels
   measure_ps_voltage();
@@ -261,6 +278,9 @@ void setup()
 // Main program loop
 void loop()
 {
+  // Check power supply status
+  ps_state_update();
+
   // Handle cooldown
   if (cooldown_timer >= cooldown_period)
   {
@@ -500,6 +520,108 @@ void i2c_status_requested()
   }
 }
 
+void ps_en_isr()
+{
+  // We only get here when PS_EN had a rising edge
+
+  // Power supply was disabled
+  if (ps_state == disabled)
+  {
+    // We are starting to stabilize the power supply!
+    ps_state = stabilizing;
+    ps_stabilize_time = 0;
+    if (debug)
+    {
+      usb.println("Power supply stabilizing...");
+    }
+  }
+
+  // Power supply was stabilizing
+  else if (ps_state == stabilizing)
+  {
+    // Did we get the edge in time?
+    if (ps_stable_timer <= ps_toggle_time)
+    {
+      ps_stabilize_time += ps_stable_timer;
+    }
+    else
+    {
+      // Didn't get the edge in time, restart stabilizing process
+      ps_stabilize_time = 0;
+    }
+
+    // Are we stable?
+    if (ps_stabilize_time >= ps_stable_time)
+    {
+      // We are stable!
+      ps_state = stable;
+      if (debug)
+      {
+        usb.println("Power supply now stable!");
+      }
+    }
+  }
+
+  // Power supply was already stable
+  else if (ps_state == stable)
+  {
+    // We stay stable unless we missed an edge
+    if (ps_stable_timer > ps_toggle_time)
+    {
+      // Back to stabilizing
+      ps_state = stabilizing;
+      ps_stabilize_time = 0;
+      if (debug)
+      {
+        usb.print("Power supply re-stabilizing (");
+        usb.print(ps_stable_timer);
+        usb.println(" us)...");
+      }
+    }
+  }
+
+  // Unknown state!
+  else
+  {
+    // Should never get here!
+    // Put ps_state back to a known state (start stabilizing)
+    ps_state = stabilizing;
+    ps_stabilize_time = 0;
+  }
+
+  // We handled an edge, so the timer resets no matter what
+  ps_stable_timer = 0;
+}
+
+void ps_state_update()
+{
+  // Disable interrupts while handing power supply state (race conditions!)
+  noInterrupts();
+
+  // Have we missed any edges?
+  if (ps_stable_timer > ps_toggle_time)
+  {
+    // Mark power supply as disabled, we missed an edge
+    if (ps_state != disabled)
+    {
+      ps_state = disabled;
+      if (debug)
+      {
+        usb.println("Power supply appears disabled.");
+        usb.print("It has been ");
+        usb.print(ps_stable_timer);
+        usb.print(" us, and ps_stable_timer > ps_toggle time = ");
+        usb.print(static_cast<int>(ps_stable_timer > ps_toggle_time));
+        usb.println(".");
+      }
+    }
+    ps_stable_timer = 0;
+  }
+
+  // We are done handling power supply state, re-enable interrupts
+  interrupts();
+}
+
 void i2c_addr_auto_assign()
 {
   // Watch for address broadcast
@@ -657,13 +779,16 @@ void handle_shorted(const uint8_t& channel)
   any_shorted = true;
 
   // Disable power supply
+  detachInterrupt(digitalPinToInterrupt(ps_enable_pin));
   pinMode(ps_enable_pin, OUTPUT);
   digitalWrite(ps_enable_pin, LOW);
+  ps_state = disabled;
 
   // TODO: remove debug
   usb.print("Channel ");
   usb.print(channel + 1);
   usb.println(" is shorted!");
+  usb.println("Power supply has been disabled for safety.");
 }
 
 bool is_open(const float& voltage)
