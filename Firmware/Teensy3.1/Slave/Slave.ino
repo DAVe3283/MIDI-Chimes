@@ -129,6 +129,9 @@ void i2c_status_requested();
 // I2C address auto-assignment procedure
 void i2c_addr_auto_assign();
 
+// Startup diagnostics
+void measure_ps_voltage();
+
 // Strike a chime (handles thermals, settle time, etc.)
 void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle);
 
@@ -137,6 +140,9 @@ float read_voltage(const uint8_t& channel);
 
 // Check channel for shorts
 bool is_shorted(const float& voltage);
+
+// Handle a shorted channel (disable power supply)
+void handle_shorted(const uint8_t& channel);
 
 // Check channel for opens
 bool is_open(const float& voltage);
@@ -225,37 +231,12 @@ void setup()
 
   // I2C address auto-config
   i2c_addr_auto_assign();
+  // Master won't release us to continue until the power supply is stable
 
-  // Measure power supply voltages at boot
-  // DEBUG: Delay to let power supply reading stabilize
-  delay(100);
-  // TODO: verify power supply is enabled (look for ps_enable_pin to toggle)
-  for (int channel(0); channel < num_channels; ++channel)
-  {
-    // Get current voltage
-    const float voltage(read_voltage(channel));
-    ps_voltage[channel] = voltage;
-    verified[channel] = true;
+  // Measure power supply voltages at boot, look for connected channels
+  measure_ps_voltage();
 
-    // We assume the power supply setpoint is the max measured voltage
-    if (voltage > ps_setpoint)
-    {
-      ps_setpoint = voltage;
-    }
-
-    // Determine if the channel is connected to anything
-    if (voltage > connected_min_voltage)
-    {
-      channel_state[channel] = channel_working;
-      num_connected_channels++;
-    }
-    else
-    {
-      channel_state[channel] = channel_disconnected;
-    }
-  }
-
-  // Set shorted voltage threshold at startup (possibly more aggressive than during operation)
+  // Calculate shorted voltage threshold at startup (possibly more aggressive than during operation)
   float shorted_level(shorted_voltage);
   if (shorted_level < (ps_setpoint * shorted_percent_ps_setpoint))
   {
@@ -547,9 +528,38 @@ void i2c_addr_auto_assign()
   Wire.onRequest(i2c_status_requested);
 }
 
+void measure_ps_voltage()
+{
+  // Measure power supply voltages
+  for (int channel(0); channel < num_channels; ++channel)
+  {
+    // Get current voltage
+    const float voltage(read_voltage(channel));
+    ps_voltage[channel] = voltage;
+    verified[channel] = true;
+
+    // We assume the power supply setpoint is the max measured voltage
+    if (voltage > ps_setpoint)
+    {
+      ps_setpoint = voltage;
+    }
+
+    // Determine if the channel is connected to anything
+    if (voltage > connected_min_voltage)
+    {
+      channel_state[channel] = channel_working;
+      num_connected_channels++;
+    }
+    else
+    {
+      channel_state[channel] = channel_disconnected;
+    }
+  }
+}
+
 void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
 {
-  float dc = static_cast<float>(duty_cycle) / static_cast<float>((1 << pwm_bits) - 1);
+  const float dc(static_cast<float>(duty_cycle) / static_cast<float>((1 << pwm_bits) - 1));
   if (debug)
   {
     usb.print("Got strike command for channel ");
@@ -575,7 +585,18 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
     }
     return;
   }
-  set_dc[channel] = dc;
+
+  // Verify the channel is working
+  if (channel_state[channel] != channel_working)
+  {
+    if (debug)
+    {
+      usb.print("Channel is not working (channel_state = ");
+      usb.print(channel_state[channel], DEC);
+      usb.print("); ignoring this request!");
+    }
+    return;
+  }
 
   // Verify we are not already striking the chime, and the settle has completed
   if (!striking[channel] && (strike_timer[channel] >= settle_time))
@@ -589,6 +610,7 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
       strike_timer[channel] = 0; // Start strike timer
       strikes_remaining[channel]--; // We used an available strike
       analogWrite(chime_pins[channel], duty_cycle); // Turn on PWM
+      set_dc[channel] = dc; // Store the PWM DC for channel validation
     }
     else
     {
@@ -631,6 +653,22 @@ bool is_shorted(const float& voltage)
   return voltage < (ps_setpoint * shorted_percent_ps_setpoint);
 }
 
+void handle_shorted(const uint8_t& channel)
+{
+  // Log shorted status
+  channel_state[channel] = channel_failed_short;
+  any_shorted = true;
+
+  // Disable power supply
+  pinMode(ps_enable_pin, OUTPUT);
+  digitalWrite(ps_enable_pin, LOW);
+
+  // TODO: remove debug
+  usb.print("Channel ");
+  usb.print(channel + 1);
+  usb.println(" is shorted!");
+}
+
 bool is_open(const float& voltage)
 {
   return voltage > (ps_setpoint * open_percent_ps_setpoint);
@@ -658,12 +696,7 @@ bool verify_on(const uint8_t& channel)
     // Check if channel failed short circuit
     if (is_shorted(voltage))
     {
-      channel_state[channel] = channel_failed_short;
-      any_shorted = true;
-      // TODO: remove debug
-      usb.print("Channel ");
-      usb.print(channel + 1);
-      usb.println(" is shorted!");
+      handle_shorted(channel);
     }
 
     // Check if channel failed open circuit
@@ -715,12 +748,7 @@ bool verify_off(const uint8_t& channel)
     // Check if channel failed short circuit
     if (is_shorted(ps_voltage[channel]))
     {
-      channel_state[channel] = channel_failed_short;
-      any_shorted = true;
-      // TODO: remove debug
-      usb.print("Channel ");
-      usb.print(channel + 1);
-      usb.println(" is shorted!");
+      handle_shorted(channel);
     }
 
     // Ignore "opens", because that is what we want. It is probably just flyback

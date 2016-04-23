@@ -146,7 +146,7 @@ const uint16_t lcd_bl_pwm_step((lcd_bl_pwm_max - lcd_bl_pwm_min) / 2500);
 // Timeouts
 const uint16_t blink_time(20000); // microseconds
 const uint16_t ps_en_toggle_time(1000); // microseconds
-const uint16_t sleep_time(5000); // milliseconds (5 minutes = 300000)
+const uint32_t sleep_time(5 * 1000); // milliseconds
 
 // Graphics settings
 const uint16_t console_bg(0x0000); // Windows 98+ #000000 --> RGB565
