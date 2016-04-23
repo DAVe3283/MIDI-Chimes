@@ -590,7 +590,10 @@ void ps_en_isr()
   }
 
   // We handled an edge, so the timer resets no matter what
-  ps_stable_timer = 0;
+  ps_stable_timer = 16;
+  // TODO: figure out why time goes backwards later in the program
+  // When time goes backwards, ps_stable_timer goes to -3(ish) (as a uint32_t),
+  // which causes all sorts of grief.
 }
 
 void ps_state_update()
@@ -599,8 +602,9 @@ void ps_state_update()
   noInterrupts();
 
   // Have we missed any edges?
-  const bool missed_edge(ps_stable_timer > ps_toggle_time);
-  if (missed_edge)
+  // const uint32_t timer_val(ps_stable_timer);
+  // const bool missed_edge(timer_val > ps_toggle_time);
+  if (ps_stable_timer > ps_toggle_time)
   {
     // Mark power supply as disabled, we missed an edge
     if (ps_state != disabled)
@@ -609,11 +613,13 @@ void ps_state_update()
       if (debug)
       {
         usb.println("Power supply appears disabled.");
-        usb.print("It has been ");
-        usb.print(ps_stable_timer);
-        usb.print(" us, and ps_stable_timer > ps_toggle time = ");
-        usb.print(static_cast<int>(missed_edge));
-        usb.println(".");
+        // usb.print("It has been ");
+        // usb.print(ps_stable_timer);
+        // usb.print(" us (was ");
+        // usb.print(timer_val);
+        // usb.print(" us), and ps_stable_timer > ps_toggle time = ");
+        // usb.print(static_cast<int>(missed_edge));
+        // usb.println(".");
       }
     }
     ps_stable_timer = 0;
