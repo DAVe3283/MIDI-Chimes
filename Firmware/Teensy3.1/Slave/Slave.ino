@@ -6,9 +6,6 @@
 // from overheating.
 //
 // TODO:
-// * periodically check if the power supply is enabled/stable
-//   * if not, don't mark channels as shorted/open.
-//   * still attempt a strike, so we don't lose as many notes during PS startup
 // * Should I implement some sort of cumulative current limit to protect the PCB?
 //   If each coil is 2A, and all 10 are told to fire, that's 20A through the PCB traces...
 //   Now imagine if they are 10A each O_o
@@ -245,11 +242,10 @@ void setup()
   i2c_addr_auto_assign();
 
   // Wait for power supply to stabilize
-  // while (ps_state != stable)
-  // {
-  //   ps_state_update();
-  //   yield();
-  // }
+  while (ps_state != stable)
+  {
+    ps_state_update();
+  }
 
   // Measure power supply voltages at boot, look for connected channels
   measure_ps_voltage();
@@ -413,19 +409,11 @@ void loop()
 
 void i2c_startup(size_t numBytes)
 {
-  usb.print("Got ");
-  usb.print(numBytes);
-  usb.println(" bytes of I2C data.");
   // We are expecting 2 bytes (command, value)
   if (numBytes == 2)
   {
     const uint8_t command(Wire.read());
     const uint8_t value(Wire.read());
-    usb.print("Got command 0x");
-    usb.print(command, HEX);
-    usb.print(", value = 0x");
-    usb.println(value, HEX);
-
     switch (command)
     {
       // Potential new address
@@ -696,7 +684,7 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
     {
       usb.print("We only have ");
       usb.print(num_channels, DEC);
-      usb.print(" channels; ignoring this request!");
+      usb.println(" channels; ignoring this request!");
     }
     return;
   }
@@ -708,7 +696,7 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
     {
       usb.print("Channel is not working (channel_state = ");
       usb.print(channel_state[channel], DEC);
-      usb.print("); ignoring this request!");
+      usb.println("); ignoring this request!");
     }
     return;
   }
@@ -808,8 +796,8 @@ bool verify_on(const uint8_t& channel)
   const bool in_range((error < max_error_percent) && (error > -max_error_percent));
   verified[channel] = true;
 
-  // Handle failures
-  if (!in_range)
+  // Handle failures (only when power supply is stable)
+  if (!in_range && (ps_state == stable))
   {
     // Check if channel failed short circuit
     if (is_shorted(voltage))
@@ -845,6 +833,10 @@ bool verify_on(const uint8_t& channel)
     if (!in_range)
     {
       usb.println("    **** NOT IN EXPECTED RANGE! ****");
+      if (ps_state != stable)
+      {
+        usb.println("    (But power supply wasn't stable, so we are ignoring the failure.)");
+      }
     }
   }
 
@@ -860,8 +852,8 @@ bool verify_off(const uint8_t& channel)
   const bool in_range((error < max_error_percent) && (error > -max_error_percent));
   verified[channel] = true;
 
-  // Handle failures
-  if (!in_range)
+  // Handle failures (only when power supply is stable)
+  if (!in_range && (ps_state == stable))
   {
     // Check if channel failed short circuit
     if (is_shorted(ps_voltage[channel]))
@@ -890,6 +882,10 @@ bool verify_off(const uint8_t& channel)
     if (!in_range)
     {
       usb.println("    **** NOT IN EXPECTED RANGE! ****");
+      if (ps_state != stable)
+      {
+        usb.println("    (But power supply wasn't stable, so we are ignoring the failure.)");
+      }
     }
   }
 
