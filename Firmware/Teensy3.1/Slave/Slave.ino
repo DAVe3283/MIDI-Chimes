@@ -302,9 +302,6 @@ void loop()
     else
     {
       // Measure power supply voltage at the end of settle time
-      // Note: Theoretical risk of missing this measurement if a strike is
-      //       commanded exactly as settle time runs out, and we missed it on
-      //       the previous pass through. But we don't care
       if (!verified[channel] && (strike_timer[channel] >= settle_time))
       {
         verify_off(channel);
@@ -599,7 +596,7 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
   }
 
   // Verify we are not already striking the chime, and the settle has completed
-  if (!striking[channel] && (strike_timer[channel] >= settle_time))
+  if (!striking[channel] && verified[channel])
   {
     // Check for overheat
     if (strikes_remaining[channel] > 0)
