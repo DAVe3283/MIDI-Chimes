@@ -50,6 +50,9 @@ public:
     // Print the error message for the current error number
     void print_ini_error_message(Print& display, bool eol = true) const;
 
+    // Lookup a note number (0-127) from a string, NULL for invalid note number
+    static const char* lookup_note_name(const int8_t& note);
+
 private:
     // Holds the INI file used to store config settings
     IniFile ini;
@@ -64,9 +67,6 @@ private:
 
     // Parse a string ("61" or "C4#") into the MIDI note number, -1 for invalid.
     static int8_t parse_note(const char* note);
-
-    // Lookup a note number (0-127) from a string, NULL for invalid note number
-    static const char* lookup_note_name(const int8_t& note);
 
     // Parse a percentage string (0.0 - 100.0%) to a float (0.0-1.0)
     static bool parse_percentage(char* str, float& percentage);

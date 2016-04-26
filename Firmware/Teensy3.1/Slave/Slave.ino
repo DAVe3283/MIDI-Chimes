@@ -268,6 +268,13 @@ void setup()
     }
   }
 
+  // Wait for the master to say we are done
+  while (!i2c_ready) {};
+
+  // POST complete, switch to runtime ISRs
+  Wire.onReceive(i2c_receive);
+  Wire.onRequest(i2c_status_requested);
+
   // Startup complete
   digitalWrite(led_pin, LOW); // Indicate normal operation
 }
@@ -622,13 +629,6 @@ void i2c_addr_auto_assign()
   Wire.begin(I2C_SLAVE, i2c_address, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_1000);
   Wire.onRequest(i2c_startup_ack); // Ready to send ACK when requested
   interrupts();
-
-  // Wait for the master to say we are done
-  while (!i2c_ready) {};
-
-  // I2C setup complete, switch to runtime ISRs
-  Wire.onReceive(i2c_receive);
-  Wire.onRequest(i2c_status_requested);
 }
 
 void measure_ps_voltage()

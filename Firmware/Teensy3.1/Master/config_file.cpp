@@ -171,6 +171,15 @@ void config_file::print_ini_error_message(Print& display, bool eol) const
     print_ini_error_message(display, ini.getError(), eol);
 }
 
+const char* config_file::lookup_note_name(const int8_t& note)
+{
+    if (note < 0)
+    {
+        return nullptr;
+    }
+    return note_names[note];
+}
+
 int8_t config_file::parse_note(const char* note)
 {
     int noteNum(-1);
@@ -250,15 +259,6 @@ int8_t config_file::parse_note(const char* note)
     {
         return static_cast<int8_t>(noteNum);
     }
-}
-
-const char* config_file::lookup_note_name(const int8_t& note)
-{
-    if (note < 0)
-    {
-        return NULL;
-    }
-    return note_names[note];
 }
 
 bool config_file::parse_percentage(char* str, float& percentage)

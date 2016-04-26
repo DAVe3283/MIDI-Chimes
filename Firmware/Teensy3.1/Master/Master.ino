@@ -90,6 +90,9 @@ extern "C"
 // Config file
 #include "config_file.h"
 
+// Slave status message parsing
+#include "slave_status.h"
+
 using namespace midi_chimes;
 
 // -----------------------------------------------------------------------------
@@ -148,6 +151,7 @@ const uint16_t ts_max_y(4000);
 const uint32_t blink_time(20000); // microseconds
 const uint32_t ps_en_toggle_time(1000); // microseconds
 const uint32_t ps_settle_time(2500); // milliseconds
+const uint32_t slave_post_timeout(3000); // milliseconds (after ps_settle_time)
 const uint32_t sleep_time(5 * 1000); // milliseconds
 
 // Backlight brightness
@@ -199,15 +203,6 @@ enum power_state_t
   sleep_to_awake_transition,
 } power_state;
 
-// Channel states of slave channels
-enum channel_state_t : uint8_t
-{
-  channel_working = 0,
-  channel_disconnected = 1,
-  channel_failed_short = 2,
-  channel_failed_open = 3,
-};
-
 
 // -----------------------------------------------------------------------------
 // Declarations
@@ -235,6 +230,9 @@ void adjust_master_volume(int8_t change);
 // Auto-assign I2C addresses to slaves
 uint8_t i2c_addr_auto_assign();
 bool i2c_check_ack(const uint8_t& address);
+
+// Get slave status
+bool get_slave_status(const uint8_t& address, slave_status& state);
 
 void print_channel_state_string(Print& out, const channel_state_t& state);
 
@@ -503,69 +501,150 @@ void setup()
     tft.println("Check the cables are attached & oriented correctly.");
     tft.println("Check the INI file has the correct settings.");
     tft.println("Remove all power before retrying.");
-    // halt_system();
-    // ^^^ TODO: disabled for debug, re-enable when I have all the slaves
+    halt_system();
   }
   UG_ConsolePutString("done.\n");
 
   // POST slaves
   UG_ConsolePutString("Performing POST on slave boards...");
-  // needs a timer
-  // TODO: Start power supply to allow slaves to complete POST
-  // TODO: Get slave status
-  //auto slave_status[slaves_found];
+  slave_status slave_post_result[slaves_found];
+  elapsedMillis post_timer;
+  bool got_slave_status[slaves_found];
+  for (uint8_t i(0); i < slaves_found; ++i)
+  {
+    got_slave_status[i] = false;
+  }
+  uint8_t current_slave(0);
+  bool post_complete(false);
+  while (!post_complete)
+  {
+    // Enable power supply
+    if (ps_en_timer > ps_en_toggle_time)
+    {
+      // Just reset the timer. A bit of jitter isn't a problem, but wind-up is.
+      ps_en_timer = 0;
+
+      // Toggle PS_EN state
+      ps_en_high = !ps_en_high;
+      digitalWrite(ps_en_pin, ps_en_high ? HIGH : LOW);
+    }
+
+    // Request slave status
+    // for (uint8_t slave(0); slave < slaves_found; ++slave)
+    // {
+    //   if (!got_slave_status[slave])
+    //   {
+    //     got_slave_status[slave] = get_slave_status(
+    //       slave + i2c_slave_base_address,
+    //       slave_post_result[slave]);
+    //   }
+    // }
+    if (!got_slave_status[current_slave])
+    {
+      got_slave_status[current_slave] = get_slave_status(
+        current_slave + i2c_slave_base_address,
+        slave_post_result[current_slave]);
+    }
+    current_slave++;
+    if (current_slave >= slaves_found)
+    {
+      current_slave = 0;
+    }
+
+    // Determine if we have all the statuses
+    post_complete = true;
+    for (uint8_t i(0); i < slaves_expected; ++i)
+    {
+      post_complete &= got_slave_status[i];
+    }
+
+    // Handle timeout
+    if (post_timer > (ps_settle_time + slave_post_timeout))
+    {
+      draw_BSOD(tft);
+      tft.println("Timed out waiting for slaves to POST!");
+      for (uint8_t slave(0); slave < slaves_found; ++slave)
+      {
+        if (!got_slave_status[slave])
+        {
+          tft.print("Slave ");
+          tft.print(slave);
+          tft.println(" did not return a status.");
+        }
+      }
+      tft.println();
+      tft.println("Please verify all cables are connected securely, &");
+      tft.println("the correct firmware is loaded on the slaves.");
+      halt_system();
+    }
+  }
   UG_ConsolePutString("done.\n");
 
   // Verify all channels are working
   UG_ConsolePutString("Verifying channels are working...");
-  // Check all mapped notes to ensure they are working
-  for (uint8_t note(0); note < (sizeof(note_map) / sizeof(note_map[0])); ++note)
-  {
-    // Only check notes that are connected
-    if (note_map[note].slave_address)
-    {
-      // Get slave & channel
-      const uint8_t slave_no(note_map[note].slave_address - i2c_slave_base_address);
-      const uint8_t channel(note_map[note].channel);
-
-      // TODO: read slave_status[slave_no], get channel
-      channel_state_t state(channel_working); // TODO: really get this
-      if (state != channel_working)
-      {
-        draw_BSOD(tft);
-        tft.println("Channel malfunction found!");
-        tft.print("Slave:   ");
-        tft.println(slave_no);
-        tft.print("Channel: ");
-        tft.println(channel + 1);
-        tft.print("Status:  ");
-        tft.print(static_cast<uint8_t>(state), DEC);
-        tft.print(" (");
-        print_channel_state_string(tft, state);
-        tft.println(")");
-        tft.println();
-        tft.println("Check the solenoid cable is attached correctly.");
-        tft.println("Check the INI file has the correct settings.");
-        tft.println("Remove all power before retrying.");
-        halt_system();
-      }
-    }
-  }
-  // Check all connected channels for shorts (even ones we aren't expecting to be connected)
+  // Check all slaves for sanity & shorts (any short will cause the slave to disable the power supply)
   for (uint8_t slave(0); slave < slaves_found; ++slave)
   {
-    for (int channel(0); channel < notes_per_slave; ++channel)
+    // Verify it is configured how we expect
+    const uint8_t slave_pwm_bits(slave_post_result[slave].pwm_bits());
+    if (slave_pwm_bits != pwm_bits)
     {
-      // TODO: read slave_status[slave_no], get channel
-      channel_state_t state(channel_working); // TODO: really get this
-
+      draw_BSOD(tft);
+      tft.println("Slave configuration / firmware error!");
+      tft.print("Slave ");
+      tft.print(slave);
+      tft.print(" is configured to use ");
+      tft.print(slave_pwm_bits);
+      tft.println("-bit PWM, but the");
+      tft.print("system is configured to use ");
+      tft.print(pwm_bits);
+      tft.println("-bit PWM!");
+      tft.println();
+      tft.println("Please verify the correct firmware is loaded on the");
+      tft.println("slaves and the master boards.");
+      // tft.print("PWM: ");
+      // tft.print(slave_post_result[0].pwm_bits());
+      // tft.print(", ");
+      // tft.print(slave_post_result[1].pwm_bits());
+      // tft.print(", ");
+      // tft.println(slave_post_result[2].pwm_bits());
+      // tft.print("Channels: ");
+      // tft.print(slave_post_result[0].num_channels());
+      // tft.print(", ");
+      // tft.print(slave_post_result[1].num_channels());
+      // tft.print(", ");
+      // tft.println(slave_post_result[2].num_channels());
+      halt_system();
+    }
+    const uint8_t slave_channels(slave_post_result[slave].num_channels());
+    if (slave_channels != notes_per_slave)
+    {
+      draw_BSOD(tft);
+      tft.println("Configuration / firmware error!");
+      tft.print("Slave ");
+      tft.print(slave);
+      tft.print(" has ");
+      tft.print(slave_channels);
+      tft.println("channel(s), but the system is setup");
+      tft.print("for ");
+      tft.print(notes_per_slave);
+      tft.println(" channel slaves!");
+      tft.println();
+      tft.println("Please verify the correct slave(s) are attached,");
+      tft.println("and the master has the correct firmware loaded.");
+      halt_system();
+    }
+    // Verify the channels
+    for (uint8_t channel(0); channel < notes_per_slave; ++channel)
+    {
       // Verify the channel is working
+      const channel_state_t state(slave_post_result[slave].channel_state(channel));
       if (state == channel_failed_short)
       {
         draw_BSOD(tft);
         tft.println("Shorted channel found!");
         tft.print("Slave:   ");
-        tft.println(slave_no);
+        tft.println(slave);
         tft.print("Channel: ");
         tft.println(channel + 1);
         tft.print("Status:  ");
@@ -584,6 +663,45 @@ void setup()
       }
     }
   }
+  // Check all mapped notes to ensure they are working
+  for (uint8_t note(0); note < (sizeof(note_map) / sizeof(note_map[0])); ++note)
+  {
+    // Only check notes that are connected
+    if (note_map[note].slave_address)
+    {
+      // Get slave & channel
+      const uint8_t slave_no(note_map[note].slave_address - i2c_slave_base_address);
+      const uint8_t channel(note_map[note].channel);
+
+      // Get channel state
+      const channel_state_t state(slave_post_result[slave_no].channel_state(channel));
+      if (state != channel_working)
+      {
+        draw_BSOD(tft);
+        tft.println("Channel malfunction found!");
+        tft.print("Note:    ");
+        tft.print(note);
+        tft.print(" (");
+        tft.print(config_file::lookup_note_name(note));
+        tft.println(")");
+        tft.print("Slave:   ");
+        tft.println(slave_no);
+        tft.print("Channel: ");
+        tft.println(channel + 1);
+        tft.print("Status:  ");
+        tft.print(static_cast<uint8_t>(state), DEC);
+        tft.print(" (");
+        print_channel_state_string(tft, state);
+        tft.println(")");
+        tft.println();
+        tft.println("Check the solenoid cable is attached correctly.");
+        tft.println("Check the INI file has the correct settings.");
+        tft.println("Remove all power before retrying.");
+        halt_system();
+      }
+    }
+  }
+
   UG_ConsolePutString("done.\n");
 
   // Configure USB MIDI
@@ -1013,6 +1131,58 @@ bool i2c_check_ack(const uint8_t& address)
   }
 
   return false;
+}
+
+bool get_slave_status(const uint8_t& address, slave_status& state)
+{
+  // Holds the response
+  const size_t expected_status_size(6 + (4 * notes_per_slave));
+  uint8_t buffer[expected_status_size];
+
+  // Request the status
+  const size_t status_size(Wire1.requestFrom(address, expected_status_size, I2C_STOP, 1000));
+  for (size_t i(0); i < status_size; ++i)
+  {
+    buffer[i] = Wire1.read();
+  }
+
+  // Parse the status
+  state.load_slave_status(buffer, status_size);
+  // if (buffer[0] == 1)
+  // {
+  //   buffer[0] = 0;
+  //   state.load_slave_status(buffer, status_size);
+  //   draw_BSOD(tft);
+  //   tft.print("Got ");
+  //   tft.print(status_size);
+  //   tft.print(" bytes. State is valid? ");
+  //   tft.println(static_cast<int>(state.valid()));
+  //   tft.print("Buffer: 1, ..., ");
+  //   tft.print(buffer[status_size - 2]);
+  //   tft.print(", ");
+  //   tft.println(buffer[status_size - 1]);
+  //   halt_system();
+  // }
+  // if (state.valid())
+  // {
+  //   draw_BSOD(tft);
+  //   tft.println("Valid state dump.");
+  //   for (int i = 0; i < 6; ++i)
+  //   {
+  //     tft.print(buffer[i]);
+  //     tft.print(", ");
+  //   }
+  //   tft.print("..., ");
+  //   tft.print(buffer[status_size - 2]);
+  //   tft.print(", ");
+  //   tft.println(buffer[status_size - 1]);
+  //   tft.print("PWM Bits: ");
+  //   tft.println(state.pwm_bits());
+  //   tft.print("Channels: ");
+  //   tft.println(state.num_channels());
+  //   halt_system();
+  // }
+  return state.valid();
 }
 
 void print_channel_state_string(Print& out, const channel_state_t& state)
