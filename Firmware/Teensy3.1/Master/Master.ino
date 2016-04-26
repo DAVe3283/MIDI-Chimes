@@ -11,8 +11,16 @@
 // * doesn't work as expected (i.e. unplugged.)
 // * Find out why, and make the master handle this gracefully, so the host PC
 // * doesn't have to deal with a hung MIDI device.
-// * This could be an I2C timeout, which I am not handling.
+// * This could from an I2C timeout, which I am not yet handling.
 // *****************************************************************************
+// * POST
+//   * After assigning slaves I2C addresses, verify the channels are all as expected:
+//     * Enable PS & let it settle
+//     * Tell slaves to begin normal operation (so they self-test)
+//     * Wait for that to complete (fixed delay, polling, ???)
+//     * Read slave status
+//     * Make sure only NC channels are "channel_disconnected" (1)
+//     * All other channels must be "channel_working" (0)
 // * Velocity map (MIDI is 0-127, I need a PWM value ~50%-100%)
 //   * Working, but I should calibrate PWM value to chime volume with a SPL meter
 //   * Per-note velocity map? This would make the chimes perfectly linear
@@ -36,8 +44,6 @@
 // * Make the display do useful things
 //   * Show errors
 //   * Show input source (USB or physical MIDI)
-//   * Master volume
-//     * Working as proof of concept, but I want to implement this better
 //   * Options
 //     * Override velocity to master volume vs. scale velocity 0-master
 //       * Default should probably be scale
@@ -137,16 +143,18 @@ const uint16_t ts_max_x(3800);
 const uint16_t ts_min_y( 130);
 const uint16_t ts_max_y(4000);
 #endif
+
+// Timeouts
+const uint32_t blink_time(20000); // microseconds
+const uint32_t ps_en_toggle_time(1000); // microseconds
+const uint32_t ps_settle_time(2500); // milliseconds
+const uint32_t sleep_time(5 * 1000); // milliseconds
+
 // Backlight brightness
 const uint16_t lcd_bl_pwm_max(0xFFFF);
 const uint16_t lcd_bl_pwm_min(0x0C00);
-const uint16_t lcd_bl_pwm_step((lcd_bl_pwm_max - lcd_bl_pwm_min) / 2500);
-// We want to take 2500 ms to bring the backlight up, as that is how long the PS takes to settle.
-
-// Timeouts
-const uint16_t blink_time(20000); // microseconds
-const uint16_t ps_en_toggle_time(1000); // microseconds
-const uint32_t sleep_time(5 * 1000); // milliseconds
+const uint16_t lcd_bl_pwm_step((lcd_bl_pwm_max - lcd_bl_pwm_min) / ps_settle_time);
+// We want to ramp up the backlight while we wait for the power supply to settle.
 
 // Graphics settings
 const uint16_t console_bg(0x0000); // Windows 98+ #000000 --> RGB565
@@ -182,6 +190,7 @@ const uint8_t midi_cmd_system_exclusive(0xF0);
 // MIDI Programs (Instruments)
 const uint8_t midi_prog_tubular_bells(0xE);
 
+// Power state of master
 enum power_state_t
 {
   awake,
@@ -189,6 +198,15 @@ enum power_state_t
   awake_to_sleep_transition,
   sleep_to_awake_transition,
 } power_state;
+
+// Channel states of slave channels
+enum channel_state_t : uint8_t
+{
+  channel_working = 0,
+  channel_disconnected = 1,
+  channel_failed_short = 2,
+  channel_failed_open = 3,
+};
 
 
 // -----------------------------------------------------------------------------
@@ -217,6 +235,8 @@ void adjust_master_volume(int8_t change);
 // Auto-assign I2C addresses to slaves
 uint8_t i2c_addr_auto_assign();
 bool i2c_check_ack(const uint8_t& address);
+
+void print_channel_state_string(Print& out, const channel_state_t& state);
 
 // Sleep mode functions
 void power_activity(); // Activity detected, exit sleep mode & reset timer
@@ -275,7 +295,6 @@ uint16_t backlight_pwm(lcd_bl_pwm_max);
 bool play_this_program(true); // Do we play notes for the current program?
 
 // Timers
-elapsedMicros message_blink_timer;
 elapsedMicros ps_en_timer;
 elapsedMillis sleep_timer;
 
@@ -489,95 +508,83 @@ void setup()
   }
   UG_ConsolePutString("done.\n");
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Directory list SD card
-  //////////////////////////////////////////////////////////////////////////////
+  // POST slaves
+  UG_ConsolePutString("Performing POST on slave boards...");
+  // needs a timer
+  // TODO: Start power supply to allow slaves to complete POST
+  // TODO: Get slave status
+  //auto slave_status[slaves_found];
+  UG_ConsolePutString("done.\n");
 
-  // // Display card info
-  // const uint32_t cardSize(sd.card()->cardSize());
-  // if (cardSize == 0) {
-  //   sd.errorHalt(&tft, "cardSize failed");
-  // }
-  // tft.print("Card type: ");
-  // switch (sd.card()->type()) {
-  // case SD_CARD_TYPE_SD1:
-  //   tft.println("SD1");
-  //   break;
+  // Verify all channels are working
+  UG_ConsolePutString("Verifying channels are working...");
+  // Check all mapped notes to ensure they are working
+  for (uint8_t note(0); note < (sizeof(note_map) / sizeof(note_map[0])); ++note)
+  {
+    // Only check notes that are connected
+    if (note_map[note].slave_address)
+    {
+      // Get slave & channel
+      const uint8_t slave_no(note_map[note].slave_address - i2c_slave_base_address);
+      const uint8_t channel(note_map[note].channel);
 
-  // case SD_CARD_TYPE_SD2:
-  //   tft.println("SD2");
-  //   break;
+      // TODO: read slave_status[slave_no], get channel
+      channel_state_t state(channel_working); // TODO: really get this
+      if (state != channel_working)
+      {
+        draw_BSOD(tft);
+        tft.println("Channel malfunction found!");
+        tft.print("Slave:   ");
+        tft.println(slave_no);
+        tft.print("Channel: ");
+        tft.println(channel + 1);
+        tft.print("Status:  ");
+        tft.print(static_cast<uint8_t>(state), DEC);
+        tft.print(" (");
+        print_channel_state_string(tft, state);
+        tft.println(")");
+        tft.println();
+        tft.println("Check the solenoid cable is attached correctly.");
+        tft.println("Check the INI file has the correct settings.");
+        tft.println("Remove all power before retrying.");
+        halt_system();
+      }
+    }
+  }
+  // Check all connected channels for shorts (even ones we aren't expecting to be connected)
+  for (uint8_t slave(0); slave < slaves_found; ++slave)
+  {
+    for (int channel(0); channel < notes_per_slave; ++channel)
+    {
+      // TODO: read slave_status[slave_no], get channel
+      channel_state_t state(channel_working); // TODO: really get this
 
-  // case SD_CARD_TYPE_SDHC:
-  //   if (cardSize < 70000000) {
-  //     tft.println("SDHC");
-  //   } else {
-  //     tft.println("SDXC");
-  //   }
-  //   break;
-
-  // default:
-  //   tft.println("Unknown");
-  // }
-
-  // // CID Dump
-  // cid_t cid;
-  // if (!sd.card()->readCID(&cid)) {
-  //   sd.errorHalt(&tft, "readCID failed");
-  // }
-  // tft.print("Manufacturer ID: 0x");
-  // tft.println(static_cast<int>(cid.mid), HEX);
-  // tft.print("OEM ID: 0x");
-  // tft.print(cid.oid[0], HEX);
-  // tft.println(cid.oid[1], HEX);
-  // // tft.print("Product: ");
-  // // for (uint8_t i = 0; i < 5; i++) {
-  // //   tft.print(cid.pnm[i]);
-  // // }
-  // // tft.println();
-  // // tft.print("Version: ");
-  // // tft.print(static_cast<int>(cid.prv_n));
-  // // tft.print(".");
-  // // tft.println(static_cast<int>(cid.prv_m));
-  // tft.print("Serial number: 0x");
-  // tft.println(cid.psn, HEX);
-  // tft.print("Manufacturing date: ");
-  // tft.print(static_cast<int>(cid.mdt_month));
-  // tft.print("/");
-  // tft.println(2000 + cid.mdt_year_low + 10 * cid.mdt_year_high);
-  // tft.println("File listing:");
-
-  // //tft.println("SD card found! File listing:");
-  // // tft.print("FreeStack: ");
-  // // tft.println(FreeStack());
-  // // tft.println();
-
-  // // List files in root directory.
-  // if (!dirFile.open("/", O_READ))
-  // {
-  //   sd.errorHalt(&tft, "open root failed");
-  // }
-  // uint16_t files_found(0);
-  // const uint16_t nMax(13); // Max files to list
-  // while (files_found < nMax && file.openNext(&dirFile, O_READ))
-  // {
-  //   // Skip directories and hidden files.
-  //   if (!file.isSubDir() && !file.isHidden())
-  //   {
-  //     // Save dirIndex of file in directory.
-  //     //dirIndex[files_found] = file.dirIndex();
-
-  //     // Print the file number and name.
-  //     files_found++;
-  //     //tft.print(files_found++);
-  //     //tft.print(' ');
-  //     tft.print(file.dirIndex());
-  //     tft.print(" ");
-  //     file.printName(&tft);
-  //     tft.println();
-  //   }
-  //   file.close();
-  // }
+      // Verify the channel is working
+      if (state == channel_failed_short)
+      {
+        draw_BSOD(tft);
+        tft.println("Shorted channel found!");
+        tft.print("Slave:   ");
+        tft.println(slave_no);
+        tft.print("Channel: ");
+        tft.println(channel + 1);
+        tft.print("Status:  ");
+        tft.print(static_cast<uint8_t>(state), DEC);
+        tft.print(" (");
+        print_channel_state_string(tft, state);
+        tft.println(")");
+        tft.println();
+        tft.println("Even though this channel isn't mapped, it must not");
+        tft.println("be shorted, as that can damage the power supply and");
+        tft.println("coil.");
+        tft.println();
+        tft.println("Check the INI file has the correct settings.");
+        tft.println("Remove all power before retrying.");
+        halt_system();
+      }
+    }
+  }
+  UG_ConsolePutString("done.\n");
 
   // Configure USB MIDI
   // usbMIDI.setHandleNoteOff(OnNoteOff); // Not needed (might for OUT/THRU?)
@@ -983,7 +990,7 @@ uint8_t i2c_addr_auto_assign()
     }
   };
 
-  // TODO: move this to somewhere after the power supply has been activated
+  // Tell slaves startup is complete (allow them to begin their POST)
   for (int i(0); i < slaves_found; ++i)
   {
     Wire1.beginTransmission(i2c_slave_base_address + i);
@@ -1006,6 +1013,32 @@ bool i2c_check_ack(const uint8_t& address)
   }
 
   return false;
+}
+
+void print_channel_state_string(Print& out, const channel_state_t& state)
+{
+  switch (state)
+  {
+  case channel_working:
+    tft.print("Working Normally");
+    break;
+
+  case channel_disconnected:
+    tft.print("Disconnected / Solenoid Not Found");
+    break;
+
+  case channel_failed_short:
+    tft.print("Short-Circuited");
+    break;
+
+  case channel_failed_open:
+    tft.print("Failed Open-Circuit");
+    break;
+
+  default:
+    tft.print("Unknown / Invalid Channel Status");
+    break;
+  }
 }
 
 void power_activity()
