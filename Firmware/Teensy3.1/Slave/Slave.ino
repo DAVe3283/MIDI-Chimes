@@ -336,7 +336,7 @@ void loop()
   interrupts(); // re-enable ISR
 
   // Blink LED on I/O traffic
-  if (message_blink_timer >= blink_time)
+  if (!any_shorted && (message_blink_timer >= blink_time))
   {
     digitalWrite(led_pin, LOW);
   }
@@ -768,11 +768,14 @@ void handle_shorted(const uint8_t& channel)
   digitalWrite(ps_enable_pin, LOW);
   ps_state = disabled;
 
-  // TODO: remove debug
-  usb.print("Channel ");
-  usb.print(channel + 1);
-  usb.println(" is shorted!");
-  usb.println("Power supply has been disabled for safety.");
+  // Diagnostics
+  if (debug)
+  {
+    usb.print("Channel ");
+    usb.print(channel + 1);
+    usb.println(" is shorted!");
+    usb.println("Power supply has been disabled for safety.");
+  }
 }
 
 bool is_open(const float& voltage)

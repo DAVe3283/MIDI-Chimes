@@ -26,13 +26,14 @@
 //   * Per-note velocity map? This would make the chimes perfectly linear
 //   * Or a velocity formula (per note?) might be better?
 // * Actually implement master volume
+//   * Update master volume over MIDI
 // * See Notes/MIDI.md for channel, program, and OUT/THRU information.
 // * Implement I2C timeout (properly) & handle I2C errors
 //   * Probably need a very short timeout (1ms or less) to avoid messing up song
 //     * Or should we just throw a giant error and abort playback?
 //       We can only do this for SD card playback, though.
 // * Implement settings
-//   * Store them to the SD card
+//   * Storing them in EEPROM is fine
 // * Handle MIDI program change events
 //   * We are technically Program 0xE "Tubular Bells"
 //   * We might want to handle other things, or everything on the channel?
@@ -53,6 +54,7 @@
 //   * Basic file browser?
 // * Playback of MIDI files (from SD card)
 //   * Play doorbel tone from sd "doorbell" folder :P
+// * Stop other playback while doorbell is playing?
 // -----------------------------------------------------------------------------
 
 // Comment this line out if using the resistive touchscreen layer
@@ -115,7 +117,7 @@ const size_t notes_per_slave(10);
 // Duty Cycle Settings
 // This matches the slaves, and isn't directly used by the master
 const uint8_t pwm_bits(12); // 0 - 4095
-const float minimum_pwm(0.55); // 55%, lowest reliable impact to produce a chime
+const float minimum_pwm(0.55f); // 55%, lowest reliable impact to produce a chime
 const uint16_t maximum_dc((1 << pwm_bits) - 1);
 const uint16_t minimum_dc(minimum_pwm * maximum_dc);
 
@@ -168,18 +170,19 @@ const uint16_t button_text_disabled(C_GRAY);
 const uint16_t selected_color(C_GREEN);
 
 // Icons
-const char fa_icon_settings[] = "u";       // Sliders
-const char fa_icon_vol_dn[] = "F";         // Volume Down
-const char fa_icon_vol_up[] = "G";         // Volume Up
-const char fa_icon_level_up[] = "]";       // Level Up
-const char fa_icon_level_down[] = "^";     // Level Down
-const char fa_icon_folder_closed[] = "_";  // Folder, Closed (solid)
-const char fa_icon_folder_open[] = "a";    // Folder, Open (solid)
-const char fa_icon_file_generic[] = "d";   // File, Generic (outline)
-const char fa_icon_file_picture[] = "k";   // File, Picture / Image (outline)
-const char fa_icon_file_sound[] = "m";     // File, Sound / Music (outline)
-const char fa_icon_file_config[] = "o";    // File, Code / Config (outline)
-const char fa_icon_sleep_leaf[] = "C";     // Leaf (sleep)
+const char fa_icon_settings[] = "u";      // Sliders
+const char fa_icon_vol_dn[] = "F";        // Volume Down
+const char fa_icon_vol_up[] = "G";        // Volume Up
+const char fa_icon_level_up[] = "]";      // Level Up
+const char fa_icon_level_down[] = "^";    // Level Down
+const char fa_icon_folder_closed[] = "_"; // Folder, Closed (solid)
+const char fa_icon_folder_open[] = "a";   // Folder, Open (solid)
+const char fa_icon_file_generic[] = "d";  // File, Generic (outline)
+const char fa_icon_file_picture[] = "k";  // File, Picture / Image (outline)
+const char fa_icon_file_sound[] = "m";    // File, Sound / Music (outline)
+const char fa_icon_file_config[] = "o";   // File, Code / Config (outline)
+const char fa_icon_sleep_leaf[] = "C";    // Leaf (sleep)
+const char fa_icon_bell[] = "Y";          // Bell
 
 // MIDI Commands
 const uint8_t midi_cmd_note_off(0x80);
@@ -506,7 +509,7 @@ void setup()
   UG_ConsolePutString("done.\n");
 
   // POST slaves
-  UG_ConsolePutString("Performing POST on slave boards...");
+  UG_ConsolePutString("Performing slave POST...");
   slave_status slave_post_result[slaves_found];
   elapsedMillis post_timer;
   bool got_slave_status[slaves_found];
@@ -701,7 +704,6 @@ void setup()
       }
     }
   }
-
   UG_ConsolePutString("done.\n");
 
   // Configure USB MIDI
@@ -962,12 +964,18 @@ uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note)
 
   // Calculate requested velocity
   const float range(maximum_dc - minimum_dc);
-  float requested_volume(static_cast<float>(midi_velocity & 0x7F) / 127.0);
+  float requested_volume(static_cast<float>(midi_velocity & 0x7F) / 127.0f);
 
-  // If we are overriding velocity, use the current volume level
+  // Handle master volume
   if (override_velocity)
   {
-    requested_volume = static_cast<float>(master_volume) / 100.0;
+    // If we are overriding velocity, use the current volume level
+    requested_volume = static_cast<float>(master_volume) / 100.0f;
+  }
+  else
+  {
+    // Scale the volume by the master volume
+    requested_volume *= static_cast<float>(master_volume) / 100.0f;
   }
 
   // Handle calibration
@@ -1148,40 +1156,6 @@ bool get_slave_status(const uint8_t& address, slave_status& state)
 
   // Parse the status
   state.load_slave_status(buffer, status_size);
-  // if (buffer[0] == 1)
-  // {
-  //   buffer[0] = 0;
-  //   state.load_slave_status(buffer, status_size);
-  //   draw_BSOD(tft);
-  //   tft.print("Got ");
-  //   tft.print(status_size);
-  //   tft.print(" bytes. State is valid? ");
-  //   tft.println(static_cast<int>(state.valid()));
-  //   tft.print("Buffer: 1, ..., ");
-  //   tft.print(buffer[status_size - 2]);
-  //   tft.print(", ");
-  //   tft.println(buffer[status_size - 1]);
-  //   halt_system();
-  // }
-  // if (state.valid())
-  // {
-  //   draw_BSOD(tft);
-  //   tft.println("Valid state dump.");
-  //   for (int i = 0; i < 6; ++i)
-  //   {
-  //     tft.print(buffer[i]);
-  //     tft.print(", ");
-  //   }
-  //   tft.print("..., ");
-  //   tft.print(buffer[status_size - 2]);
-  //   tft.print(", ");
-  //   tft.println(buffer[status_size - 1]);
-  //   tft.print("PWM Bits: ");
-  //   tft.println(state.pwm_bits());
-  //   tft.print("Channels: ");
-  //   tft.println(state.num_channels());
-  //   halt_system();
-  // }
   return state.valid();
 }
 
@@ -1190,23 +1164,23 @@ void print_channel_state_string(Print& out, const channel_state_t& state)
   switch (state)
   {
   case channel_working:
-    tft.print("Working Normally");
+    out.print("Working Normally");
     break;
 
   case channel_disconnected:
-    tft.print("Disconnected / Solenoid Not Found");
+    out.print("Disconnected / Solenoid Not Found");
     break;
 
   case channel_failed_short:
-    tft.print("Short-Circuited");
+    out.print("Short-Circuited");
     break;
 
   case channel_failed_open:
-    tft.print("Failed Open-Circuit");
+    out.print("Failed Open-Circuit");
     break;
 
   default:
-    tft.print("Unknown / Invalid Channel Status");
+    out.print("Unknown / Invalid Channel Status");
     break;
   }
 }
