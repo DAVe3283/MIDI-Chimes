@@ -9,8 +9,6 @@
 // * Should I implement some sort of cumulative current limit to protect the PCB?
 //   If each coil is 2A, and all 10 are told to fire, that's 20A through the PCB traces...
 //   Now imagine if they are 10A each O_o
-// * Remove a lot of debug code, and/or at least make sure USB debug is enabled
-// * Add version information printout and help to USB debug
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
@@ -84,10 +82,10 @@ const uint8_t analog_read_bits(13);
 // Transistor characteristics (for diagnostics)
 // Voltages based on experimental & datasheet values for 2N6387 transistor & my coils
 const float transistor_Vce_drop(  1.1f); // Transistor V_CE when on with my coils (measured value, datasheet spec is <= 2V)
-const float connected_min_voltage(0.5f); // Voltages above this at startup are considered connected
+const float connected_min_voltage(0.1f); // Voltages above this at startup are considered connected
 const float shorted_voltage(      1.5f); // Voltages below this are considered shorted (regardless of ps_setpoint)
 // Error limits (determined experimentally)
-const float max_error_percent(          0.03f); // Max error (ideal - real feedback) as a % of ps_setpoint before evaluating shorts/opens
+const float max_error_percent(          0.20f); // Max error (ideal - real feedback) as a % of ps_setpoint before evaluating shorts/opens
 const float shorted_percent_ps_setpoint(0.95f); // Voltages lower than this % of ps_setpoint when commanded off are considered shorted
 const float open_percent_ps_setpoint(   0.98f); // Voltages higher than this % of ps_setpoint when commanded on are considered open circuit
 
@@ -98,6 +96,14 @@ enum channel_state_t : uint8_t
   channel_disconnected = 1,
   channel_failed_short = 2,
   channel_failed_open = 3,
+};
+
+// State power supply can be in
+enum ps_state_t
+{
+  stable, // has been on for at least ps_stable_time
+  stabilizing, // has just turned on
+  disabled, // appears to be disabled
 };
 
 
@@ -151,6 +157,9 @@ bool is_open(const float& voltage);
 bool verify_on(const uint8_t& channel);
 bool verify_off(const uint8_t& channel);
 
+// Debug
+void print_state(Print& out, const channel_state_t& state);
+void print_state(Print& out, ps_state_t state);
 
 // -----------------------------------------------------------------------------
 // Globals
@@ -168,7 +177,7 @@ elapsedMillis ps_stable_timer;
 
 // USB Debug
 usb_serial_class usb = usb_serial_class();
-bool debug(false);
+uint8_t debug_level(0);
 
 // Are we striking currently?
 volatile bool striking[num_channels];
@@ -183,12 +192,6 @@ volatile bool verified[num_channels];
 volatile int8_t strikes_remaining[num_channels];
 
 // Power supply measurements
-enum ps_state_t
-{
-  stable, // has been on for at least ps_stable_time
-  stabilizing, // has just turned on
-  disabled, // appears to be disabled
-};
 volatile ps_state_t ps_state(disabled); // Current power supply state
 volatile uint32_t ps_stabilize_time(0); // How long the power supply has been stabilizing (microseconds)
 float ps_voltage[num_channels]; // Last measured voltage
@@ -351,37 +354,30 @@ void loop()
     const char incomingByte(static_cast<char>(usb.read()));
     message_blink_timer = 0;
 
-    // Enable debug mode
-    if (!debug)
-    {
-      debug = true;
-      usb.println("Enabled USB debug output.");
-    }
-
     switch (incomingByte)
     {
+    // Help
+    case '?':
+    case '/':
     case '\r':
+      usb.println("MIDI Chimes Slave Board");
+      usb.print("Compiled: ");
+      usb.print(__DATE__);
+      usb.print(" ");
+      usb.println(__TIME__);
       usb.println();
-      // Testing
-      for (int channel(0); channel < num_channels; ++channel)
-      {
-        usb.print("Channel ");
-        usb.print(channel + 1);
-        usb.print(" state is ");
-        usb.print(channel_state[channel]);
-        usb.print(", & last measured ");
-        usb.print(ps_voltage[channel]);
-        usb.println("V.");
-      }
-      usb.print("Power supply voltage setpoint estimated to be ");
-      usb.print(ps_setpoint);
-      usb.println("V.");
+      usb.print(  "I²C address = 0x");
+      usb.println(i2c_address, HEX);
+      usb.println();
+      usb.println("Commands:");
+      usb.println("    s   = Display status");
+      usb.println("    1-9 = Set debug output to the specified level");
+      usb.println("    0   = Disable debug output");
+      usb.println();
       break;
 
+    // Select USB debug output level
     case '0':
-      strike_chime(4, (1 << pwm_bits) - 1);
-      break;
-
     case '1':
     case '2':
     case '3':
@@ -391,24 +387,62 @@ void loop()
     case '7':
     case '8':
     case '9':
-      strike_chime(4, (1 << pwm_bits) * (incomingByte - '0') / 10);
+      debug_level = incomingByte - '0';
+      usb.print("USB debug ");
+      if (debug_level > 0)
+      {
+        usb.print("ENABLED (Level ");
+        usb.print(debug_level);
+        usb.println(").");
+      }
+      else
+      {
+        usb.println("DISABLED.");
+      }
+      usb.println();
       break;
 
-    case 'r':
-    case 'R':
-      usb.print("Channel 5 currently measures ");
-      usb.print(read_voltage(4));
-      usb.println("V.");
-      break;
-
+    // Display current status
     case 's':
     case 'S':
-      i2c_status_requested();
+      usb.print("Power supply state: ");
+      print_state(usb, ps_state);
+      usb.println();
+      if (any_shorted)
+      {
+        usb.println("Shorted channel(s) found; power supply forcibly disabled by this slave!");
+      }
+      usb.print("Power supply voltage setpoint (estimated at boot): ");
+      usb.print(ps_setpoint);
+      usb.println(" V");
+      usb.println();
+      for (int channel(0); channel < num_channels; ++channel)
+      {
+        usb.print("Channel ");
+        if (channel < 9)
+        {
+          usb.print(" ");
+        }
+        usb.print(channel + 1);
+        usb.print(" last measured ");
+        if (ps_voltage[channel] < 10.0f)
+        {
+          usb.print(" ");
+        }
+        usb.print(ps_voltage[channel]);
+        usb.print(" V; state = ");
+        usb.print(channel_state[channel]);
+        usb.print(" (");
+        print_state(usb, channel_state[channel]);
+        usb.println(")");
+      }
+      usb.println();
       break;
 
+    // Unknown commands
     default:
-      // Echo unknown commands (sanity check the serial link)
-      usb.print(incomingByte);
+      usb.println("Press '?' for help.");
+      usb.println();
       break;
     }
   }
@@ -506,7 +540,7 @@ void i2c_status_requested()
   const size_t wrote(Wire.write(buffer, sizeof(buffer)));
   message_blink_timer = 0;
 
-  if (debug && (wrote != sizeof(buffer)))
+  if ((debug_level >= 1) && (wrote != sizeof(buffer)))
   {
     usb.print("I2C transmission failed! Tried to write ");
     usb.print(sizeof(buffer));
@@ -526,7 +560,7 @@ void ps_en_isr()
     // We are starting to stabilize the power supply!
     ps_state = stabilizing;
     ps_stabilize_time = 0;
-    if (debug)
+    if (debug_level >= 2)
     {
       usb.println("Power supply stabilizing...");
     }
@@ -551,7 +585,7 @@ void ps_en_isr()
     {
       // We are stable!
       ps_state = stable;
-      if (debug)
+      if (debug_level >= 2)
       {
         usb.println("Power supply now stable!");
       }
@@ -567,7 +601,7 @@ void ps_en_isr()
       // Back to stabilizing
       ps_state = stabilizing;
       ps_stabilize_time = 0;
-      if (debug)
+      if (debug_level >= 2)
       {
         usb.print("Power supply re-stabilizing (");
         usb.print(ps_stable_timer);
@@ -601,9 +635,12 @@ void ps_state_update()
     if (ps_state != disabled)
     {
       ps_state = disabled;
-      if (debug)
+      if (debug_level >= 2)
       {
-        usb.println("Watchdog timeout exceeded, assuming power supply is disabled.");
+        usb.print("Watchdog timeout exceeded (");
+        usb.print(ps_stable_timer);
+        usb.println(" ms).");
+        usb.println("Assuming power supply is now disabled.");
       }
     }
     ps_stable_timer = 0;
@@ -663,9 +700,9 @@ void measure_ps_voltage()
 void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
 {
   const float dc(static_cast<float>(duty_cycle) / static_cast<float>((1 << pwm_bits) - 1));
-  if (debug)
+  if (debug_level >= 1)
   {
-    usb.print("Got strike command for channel ");
+    usb.print("Strike commanded. Channel ");
     usb.print(channel + 1, DEC);
     usb.print(", PWM Duty Cycle: ");
     usb.print(dc * 100.0f);
@@ -679,10 +716,9 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
   // Verify channel is sane (prevent buffer overflow)
   if (channel >= num_channels)
   {
-    // TODO: log error?
-    if (debug)
+    if (debug_level >= 1)
     {
-      usb.print("We only have ");
+      usb.print("--> We only have ");
       usb.print(num_channels, DEC);
       usb.println(" channels; ignoring this request!");
     }
@@ -692,11 +728,9 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
   // Verify the channel is working
   if (channel_state[channel] != channel_working)
   {
-    if (debug)
+    if (debug_level >= 1)
     {
-      usb.print("Channel is not working (channel_state = ");
-      usb.print(channel_state[channel], DEC);
-      usb.println("); ignoring this request!");
+      usb.println("--> Channel is not working; ignoring this request!");
     }
     return;
   }
@@ -719,11 +753,9 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
     {
       // Overheated
       // TODO: log this, report to master, etc.
-      if (debug)
+      if (debug_level >= 1)
       {
-        usb.print("Channel ");
-        usb.print(channel + 1, DEC);
-        usb.println(" overheated! Skipped strike.");
+        usb.println("--> Channel overheated! Skipped strike.");
       }
     }
   }
@@ -731,11 +763,9 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
   {
     // Already striking or settling
     // TODO: Log this, report to master, etc.
-    if (debug)
+    if (debug_level >= 1)
     {
-      usb.print("Already striking/settling channel ");
-      usb.print(channel + 1, DEC);
-      usb.println("! Skipped strike.");
+      usb.println("--> Already striking/settling channel! Skipped strike.");
     }
   }
 }
@@ -769,7 +799,7 @@ void handle_shorted(const uint8_t& channel)
   ps_state = disabled;
 
   // Diagnostics
-  if (debug)
+  if (debug_level >= 1)
   {
     usb.print("Channel ");
     usb.print(channel + 1);
@@ -812,14 +842,16 @@ bool verify_on(const uint8_t& channel)
     else if (is_open(voltage))
     {
       channel_state[channel] = channel_failed_open;
-      // TODO: remove debug
-      usb.print("Channel ");
-      usb.print(channel + 1);
-      usb.println(" won't turn on!");
+      if (debug_level >= 1)
+      {
+        usb.print("Channel ");
+        usb.print(channel + 1);
+        usb.println(" won't turn on!");
+      }
     }
   }
 
-  if (debug)
+  if (debug_level >= 3)
   {
     usb.print("Verifying channel ");
     usb.print(channel + 1);
@@ -868,7 +900,7 @@ bool verify_off(const uint8_t& channel)
     // voltage anyway.
   }
 
-  if (debug)
+  if (debug_level >= 3)
   {
     usb.print("Verifying channel ");
     usb.print(channel + 1);
@@ -893,4 +925,52 @@ bool verify_off(const uint8_t& channel)
   }
 
   return in_range;
+}
+
+void print_state(Print& out, const channel_state_t& state)
+{
+  switch (state)
+  {
+  case channel_working:
+    out.print("Working Normally");
+    break;
+
+  case channel_disconnected:
+    out.print("Disconnected / Solenoid Not Found");
+    break;
+
+  case channel_failed_short:
+    out.print("Short-Circuited");
+    break;
+
+  case channel_failed_open:
+    out.print("Failed Open-Circuit");
+    break;
+
+  default:
+    out.print("Unknown / Invalid Channel Status");
+    break;
+  }
+}
+
+void print_state(Print& out, ps_state_t state)
+{
+  switch (state)
+  {
+    case stable:
+      out.print("Stable");
+      break;
+
+    case stabilizing:
+      out.print("Stabilizing");
+      break;
+
+    case disabled:
+      out.print("Disabled");
+      break;
+
+    default:
+      out.print("Unknown / Invalid");
+      break;
+  }
 }
