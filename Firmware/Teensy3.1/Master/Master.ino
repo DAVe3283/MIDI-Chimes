@@ -206,6 +206,11 @@ enum power_state_t
   sleep_to_awake_transition,
 } power_state;
 
+// Doorbell song (hard coded for now, TODO: play off SD card)
+// E5 C5 D5 G4, G4 D5 E5 C5 works on these chimes, but one octave lower might too
+const uint8_t  doorbell_song_notes[] = {  76,  72,  74,  67,   67,  74,  76,  72, }; // or 64,60,62,55,55,62,64,60
+const uint32_t doorbell_note_delay[] = {   0, 500, 500, 500, 1000, 500, 500, 500, }; // milliseconds before starting this note
+const size_t   doorbell_song_length(sizeof(doorbell_song_notes) / sizeof(*doorbell_song_notes));
 
 // -----------------------------------------------------------------------------
 // Declarations
@@ -233,6 +238,10 @@ void adjust_master_volume(int8_t change);
 // Auto-assign I2C addresses to slaves
 uint8_t i2c_addr_auto_assign();
 bool i2c_check_ack(const uint8_t& address);
+
+// Doorbell Functions
+void doorbell_isr(); // Doorbell physically pressed
+void doorbell_update(); // Update doorbell software state, start chiming, etc.
 
 // Get slave status
 bool get_slave_status(const uint8_t& address, slave_status& state);
@@ -271,6 +280,10 @@ void fb_draw_highlight(int16_t line);
 void draw_sleep_window();
 void sleep_callback(UG_MESSAGE* msg);
 
+// Doorbell window
+void draw_doorbell_window();
+void doorbell_callback(UG_MESSAGE* msg);
+
 
 // -----------------------------------------------------------------------------
 // Globals
@@ -295,9 +308,15 @@ uint16_t backlight_pwm(lcd_bl_pwm_max);
 // MIDI state
 bool play_this_program(true); // Do we play notes for the current program?
 
+// Doorbell
+volatile bool doorbell_pressed(false); // Set to true in ISR when the doorbell is pressed
+bool doorbell_playing(false); // True while we are playing the doorbell song
+size_t doorbell_song_index(0); // Used to play through the hard coded song, will be removed when we switch to MIDI files
+
 // Timers
 elapsedMicros ps_en_timer;
 elapsedMillis sleep_timer;
+elapsedMillis doorbell_timer;
 
 // Serial IO
 HardwareSerial midi = HardwareSerial();
@@ -358,6 +377,13 @@ UG_TEXTBOX sleep_icon;
 UG_TEXTBOX sleep_text;
 UG_OBJECT obj_buff_sleep_window[2];
 
+// Doorbell window
+UG_WINDOW doorbell_window;
+UG_TEXTBOX doorbell_icon;
+UG_TEXTBOX doorbell_text;
+UG_OBJECT obj_buff_doorbell_window[2];
+
+
 // -----------------------------------------------------------------------------
 // Function Definitions
 // -----------------------------------------------------------------------------
@@ -379,6 +405,10 @@ void setup()
   pinMode(ps_en_pin, OUTPUT);
   digitalWrite(ps_en_pin, LOW);
   ps_en_high = false;
+
+  // Configure doorbell
+  pinMode(doorbell_pin, INPUT);
+  attachInterrupt(digitalPinToInterrupt(doorbell_pin), doorbell_isr, RISING);
 
   // Configure LCD backlight
   pinMode(lcd_backlight_pin, OUTPUT);
@@ -715,20 +745,17 @@ void setup()
   // Configure hardware MIDI
   midi.begin(31250, SERIAL_8N1);
 
-  // Draw Main Window
+  // Configure µGUI
+  UG_ConsolePutString("Initializing \xE6GUI...");
+  // Draw windows
   draw_main_window();
-
-  // file browse window
   draw_fb_window();
-
-  // Settings window
   draw_settings_window();
-
-  // Sleep window
   draw_sleep_window();
-
+  draw_doorbell_window();
   // Start GUI at main window
   UG_WindowShow(&main_window);
+  UG_ConsolePutString("done.\n");
 
   // Set initial power state
   power_state = awake;
@@ -740,6 +767,9 @@ void loop()
 {
   // Manage power state (sleep)
   power_state_update();
+
+  // Handle doorbell
+  doorbell_update();
 
   // Handle power supply
   if (ps_en_timer > ps_en_toggle_time)
@@ -1139,6 +1169,61 @@ bool i2c_check_ack(const uint8_t& address)
   }
 
   return false;
+}
+
+void doorbell_isr()
+{
+  doorbell_pressed = true;
+}
+
+void doorbell_update()
+{
+  // Look for doorbell pressed event
+  if (doorbell_pressed)
+  {
+    // Wake up the chimes if necessary
+    power_activity();
+
+    // Once awake, trigger the doorbell
+    if (power_state == awake)
+    {
+      doorbell_pressed = false;
+      if (!doorbell_playing)
+      {
+        doorbell_playing = true;
+        doorbell_timer = 0;
+        doorbell_song_index = 0;
+        UG_WindowShow(&doorbell_window);
+      }
+    }
+  }
+
+  // Handle doorbell playback
+  if (doorbell_playing)
+  {
+    // TODO: switch to MIDI file playback when implemented
+
+    // Play the doorbell song
+    if (doorbell_song_index < doorbell_song_length)
+    {
+      // We are in the song
+      if (doorbell_timer >= doorbell_note_delay[doorbell_song_index])
+      {
+        doorbell_timer -= doorbell_note_delay[doorbell_song_index];
+        OnNoteOn(our_channel, doorbell_song_notes[doorbell_song_index++], 127);
+      }
+    }
+    else
+    {
+      // We completed the song
+      doorbell_playing = false;
+      doorbell_song_index = 0;
+      // Return to main window
+      UG_WindowHide(&doorbell_window);
+      UG_WindowShow(&main_window);
+      return;
+    }
+  }
 }
 
 bool get_slave_status(const uint8_t& address, slave_status& state)
@@ -1704,3 +1789,35 @@ void draw_sleep_window()
 
 void sleep_callback(UG_MESSAGE* msg)
 {}
+
+void draw_doorbell_window()
+{
+  // Window layout
+  UG_WindowCreate(&doorbell_window, obj_buff_doorbell_window, sizeof(obj_buff_doorbell_window) / sizeof(*obj_buff_doorbell_window), doorbell_callback);
+  UG_WindowResize(&doorbell_window, 49, 49, 319-50, 239-50);
+  UG_WindowSetTitleTextAlignment(&doorbell_window, ALIGN_CENTER);
+  UG_WindowSetTitleText(&doorbell_window, "Doorbell");
+  // UG_WindowSetBackColor(&doorbell_window, C_FOREST_GREEN);
+  // UG_WindowSetForeColor(&doorbell_window, C_WHITE);
+
+  // UI layout variables
+  const uint16_t width(UG_WindowGetInnerWidth(&doorbell_window));
+  const uint16_t height(UG_WindowGetInnerHeight(&doorbell_window));
+
+  // Doorbell icon
+  UG_TextboxCreate(&doorbell_window, &doorbell_icon, TXB_ID_0, 0, 0, width, 50);
+  UG_TextboxSetFont(&doorbell_window, TXB_ID_0, &font_FontAwesome_mod_50X40);
+  UG_TextboxSetAlignment(&doorbell_window, TXB_ID_0, ALIGN_CENTER);
+  UG_TextboxSetText(&doorbell_window, TXB_ID_0, fa_icon_bell);
+
+  // Doorbell text
+  UG_TextboxCreate(&doorbell_window, &doorbell_text, TXB_ID_1, 0, 50, width, height);
+  UG_TextboxSetFont(&doorbell_window, TXB_ID_1, &FONT_12X20);
+  UG_TextboxSetAlignment(&doorbell_window, TXB_ID_1, ALIGN_CENTER);
+  UG_TextboxSetText(&doorbell_window, TXB_ID_1, "Doorbell Pressed!\nSomeone's at\nthe door!");
+}
+
+void doorbell_callback(UG_MESSAGE* msg)
+{
+  // TODO: tapping the doorbell window should cancel doorbell playback
+}
