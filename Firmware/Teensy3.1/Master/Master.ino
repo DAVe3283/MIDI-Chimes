@@ -208,7 +208,7 @@ const size_t   doorbell_song_length(sizeof(doorbell_song_notes) / sizeof(*doorbe
 // void OnNoteOff(uint8_t channel, uint8_t note, uint8_t velocity); // Not needed
 void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity);
 // void OnVelocityChange(uint8_t channel, uint8_t note, uint8_t velocity);
-// void OnControlChange(uint8_t channel, uint8_t control, uint8_t value);
+void OnControlChange(uint8_t channel, uint8_t control, uint8_t value);
 void OnProgramChange(uint8_t channel, uint8_t program);
 // void OnAfterTouch(uint8_t channel, uint8_t pressure);
 // void OnPitchChange(uint8_t channel, int pitch);
@@ -223,7 +223,8 @@ void send_chime(const uint8_t& address, const uint8_t& channel, const uint16_t& 
 bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out, uint8_t& slave_channel_out);
 
 // Adjust Master Volume
-void adjust_master_volume(int8_t change);
+void adjust_master_volume(int8_t change); // Adjust up/down by the specified amount
+void set_master_volume(const int8_t& volume); // Set volume the specified value (0 - 100)
 
 // Auto-assign I2C addresses to slaves
 uint8_t i2c_addr_auto_assign();
@@ -605,8 +606,11 @@ void setup()
   // Configure USB MIDI
   // usbMIDI.setHandleNoteOff(OnNoteOff); // Not needed (might for OUT/THRU?)
   usbMIDI.setHandleNoteOn(OnNoteOn);
+  // usbMIDI.setHandleVelocityChange(OnVelocityChange); // Not needed (might for OUT/THRU?)
+  usbMIDI.setHandleControlChange(OnControlChange);
   usbMIDI.setHandleProgramChange(OnProgramChange);
-  // TODO: handle more MIDI stuff?
+  // usbMIDI.setHandleAfterTouch(OnAfterTouch); // Not needed (might for OUT/THRU?)
+  // usbMIDI.setHandlePitchChange(OnPitchChange); // Not needed (might for OUT/THRU?)
 
   // Configure hardware MIDI
   midi.begin(31250, SERIAL_8N1);
@@ -734,6 +738,12 @@ void loop()
         OnNoteOn(channel, midi_buffer[0], midi_buffer[1]);
         break;
 
+      // Control Change (channel volume)
+      case midi_cmd_control_change:
+        OnControlChange(channel, midi_buffer[0], midi_buffer[1]);
+        break;
+
+      // Program change
       case midi_cmd_program_change:
         OnProgramChange(channel, midi_buffer[0]);
         break;
@@ -741,7 +751,6 @@ void loop()
       // Not implemented
       case midi_cmd_note_off:
       case midi_cmd_aftertouch:
-      case midi_cmd_control_change:
       case midi_cmd_aftertouch_mono:
       case midi_cmd_pitch_bend:
         break;
@@ -833,6 +842,37 @@ void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
   }
 }
 
+void OnControlChange(uint8_t channel, uint8_t control, uint8_t value)
+{
+  // TODO: MIDI out/thru
+
+  // Skip other channels
+  if (channel != our_channel)
+  {
+    return;
+  }
+
+  // Handle control change messages
+  // See http://nickfever.com/music/midi-cc-list for more messages
+  switch (control)
+  {
+  // Adjust system volume
+  case   7: // Volume
+  case  11: // Expression
+    set_master_volume(static_cast<int>(value) * 100 / 127);
+    break;
+
+  // Reset
+  case 121: // Reset All Controllers
+    // TODO: what needs reset?
+    break;
+
+  // Not implemented
+  default:
+    break;
+  }
+}
+
 void OnProgramChange(uint8_t channel, uint8_t program)
 {
   power_activity();
@@ -913,9 +953,11 @@ bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out,
 // Change the master volume by the amount specified
 void adjust_master_volume(int8_t change)
 {
-  // Adjust the volume
-  master_volume += change;
+  set_master_volume(master_volume + change);
+}
 
+void set_master_volume(const int8_t& volume)
+{
   // Get current button setup
   const UG_COLOR w_fg(UG_WindowGetForeColor(&main_window));
   const UG_COLOR d_fg(UG_ButtonGetForeColor(&main_window, BTN_ID_1));
@@ -924,24 +966,32 @@ void adjust_master_volume(int8_t change)
   const UG_U8    u_st(UG_ButtonGetStyle(&main_window, BTN_ID_2));
 
   // Limit range to 0-100, enable/disable buttons
-  if (master_volume >= 100)
+  if (volume >= 100)
   {
     master_volume = 100;
 
+    // Enable volume down button
+    if (d_fg != w_fg         )        { UG_ButtonSetForeColor(&main_window, BTN_ID_1, w_fg); }
+    if (d_st != BTN_STYLE_3D )        { UG_ButtonSetStyle(&main_window, BTN_ID_1, BTN_STYLE_3D); }
     // Disable volume up button
     if (u_fg != button_text_disabled) { UG_ButtonSetForeColor(&main_window, BTN_ID_2, button_text_disabled); }
     if (u_st != BTN_STYLE_2D)         { UG_ButtonSetStyle(&main_window, BTN_ID_2, BTN_STYLE_2D); }
   }
-  else if (master_volume <= 0)
+  else if (volume <= 0)
   {
     master_volume = 0;
 
     // Disable volume down button
     if (d_fg != button_text_disabled) { UG_ButtonSetForeColor(&main_window, BTN_ID_1, button_text_disabled); }
     if (d_st != BTN_STYLE_2D)         { UG_ButtonSetStyle(&main_window, BTN_ID_1, BTN_STYLE_2D); }
+    // Enable volume up button
+    if (u_fg != w_fg         )        { UG_ButtonSetForeColor(&main_window, BTN_ID_2, w_fg); }
+    if (u_st != BTN_STYLE_3D )        { UG_ButtonSetStyle(&main_window, BTN_ID_2, BTN_STYLE_3D); }
   }
   else
   {
+    master_volume = volume;
+
     // Enable both buttons
     if (d_fg != w_fg         ) { UG_ButtonSetForeColor(&main_window, BTN_ID_1, w_fg); }
     if (d_st != BTN_STYLE_3D ) { UG_ButtonSetStyle(&main_window, BTN_ID_1, BTN_STYLE_3D); }
