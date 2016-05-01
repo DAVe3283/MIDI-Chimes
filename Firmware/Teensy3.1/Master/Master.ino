@@ -13,18 +13,6 @@
 // * doesn't have to deal with a hung MIDI device.
 // * This could from an I2C timeout, which I am not yet handling.
 // *****************************************************************************
-// * POST
-//   * After assigning slaves I2C addresses, verify the channels are all as expected:
-//     * Enable PS & let it settle
-//     * Tell slaves to begin normal operation (so they self-test)
-//     * Wait for that to complete (fixed delay, polling, ???)
-//     * Read slave status
-//     * Make sure only NC channels are "channel_disconnected" (1)
-//     * All other channels must be "channel_working" (0)
-// * Velocity map (MIDI is 0-127, I need a PWM value ~50%-100%)
-//   * Working, but I should calibrate PWM value to chime volume with a SPL meter
-//   * Per-note velocity map? This would make the chimes perfectly linear
-//   * Or a velocity formula (per note?) might be better?
 // * Actually implement master volume
 //   * Update master volume over MIDI
 // * See Notes/MIDI.md for channel, program, and OUT/THRU information.
@@ -44,6 +32,7 @@
 //     * This should probably be a setting, but it seems pretty safe.
 // * Make the display do useful things
 //   * Show errors
+//     * Periodically poll the slaves for status, report any errors
 //   * Show input source (USB or physical MIDI)
 //   * Options
 //     * Override velocity to master volume vs. scale velocity 0-master
@@ -245,9 +234,12 @@ void doorbell_update(); // Update doorbell software state, start chiming, etc.
 
 // Get slave status
 bool get_slave_status(const uint8_t& address, slave_status& state);
+void validate_slave_config(const uint8_t& slave, const slave_status& status);
 void validate_slave_status(const uint8_t& slave, const slave_status& status);
+void next_slave(); // Update current_slave to the next slave
 
-// Sleep mode functions
+// Power management functions
+void ps_update(); // Toggle PS_EN when required to activate power supply
 void power_activity(); // Activity detected, exit sleep mode & reset timer
 void power_state_update(); // Update power state, display brightness, etc.
 bool backlight_up(); // Increases backlight
@@ -295,6 +287,10 @@ bool override_velocity(false); // Override velocity to master volume (true), or 
 bool play_all_programs(false); // Play all programs (instruments), or just Tubular Bells?
 
 int16_t fb_selected_line(0); // Which line in the file browse list is currently highlighted
+
+// Slave status
+uint8_t slaves_found(0); // How many slaves we found during POST
+uint8_t current_slave(0); // The current slave we are checking the status of
 
 // Power supply
 bool ps_enabled(true); // Is the power supply enabled?
@@ -527,7 +523,7 @@ void setup()
 
   // Configure slave addresses
   UG_ConsolePutString("Detecting slave boards...");
-  const uint8_t slaves_found(i2c_addr_auto_assign());
+  slaves_found = i2c_addr_auto_assign();
   if (slaves_found != slaves_expected)
   {
     draw_BSOD(tft);
@@ -552,20 +548,11 @@ void setup()
   {
     got_slave_status[i] = false;
   }
-  uint8_t current_slave(0);
   bool post_complete(false);
   while (!post_complete)
   {
     // Enable power supply
-    if (ps_en_timer > ps_en_toggle_time)
-    {
-      // Just reset the timer. A bit of jitter isn't a problem, but wind-up is.
-      ps_en_timer = 0;
-
-      // Toggle PS_EN state
-      ps_en_high = !ps_en_high;
-      digitalWrite(ps_en_pin, ps_en_high ? HIGH : LOW);
-    }
+    ps_update();
 
     // Request slave status
     if (!got_slave_status[current_slave])
@@ -578,14 +565,11 @@ void setup()
       // Validate slave status
       if (got_slave_status[current_slave])
       {
+        validate_slave_config(current_slave, status);
         validate_slave_status(current_slave, status);
       }
     }
-    current_slave++;
-    if (current_slave >= slaves_found)
-    {
-      current_slave = 0;
-    }
+    next_slave();
 
     // Determine if we have all the statuses
     post_complete = true;
@@ -652,24 +636,7 @@ void loop()
   doorbell_update();
 
   // Handle power supply
-  if (ps_en_timer > ps_en_toggle_time)
-  {
-    // Just reset the timer. A bit of jitter isn't a problem, but wind-up is.
-    ps_en_timer = 0;
-
-    // Toggle PS_EN state?
-    if (ps_enabled)
-    {
-      ps_en_high = !ps_en_high;
-    }
-    else
-    {
-      ps_en_high = false;
-    }
-
-    // Write to the pin
-    digitalWrite(ps_en_pin, ps_en_high ? HIGH : LOW);
-  }
+  ps_update();
 
   // Handle USB MIDI messages
   usbMIDI.read();
@@ -1127,7 +1094,7 @@ bool get_slave_status(const uint8_t& address, slave_status& state)
   return state.valid();
 }
 
-void validate_slave_status(const uint8_t& slave, const slave_status& status)
+void validate_slave_config(const uint8_t& slave, const slave_status& status)
 {
   // Verify the slave is using the number of PWM bits we expect
   const uint8_t slave_pwm_bits(status.pwm_bits());
@@ -1189,7 +1156,10 @@ void validate_slave_status(const uint8_t& slave, const slave_status& status)
     tft.println("the slave has at least one chime connected.");
     halt_system();
   }
+}
 
+void validate_slave_status(const uint8_t& slave, const slave_status& status)
+{
   // Verify no channels are shorted
   for (uint8_t channel(0); channel < notes_per_slave; ++channel)
   {
@@ -1208,18 +1178,15 @@ void validate_slave_status(const uint8_t& slave, const slave_status& status)
       slave_status::print_channel_state(tft, state);
       tft.println(")");
       tft.println();
-      tft.println("Even though this channel isn't mapped, it must not");
-      tft.println("be shorted, as that can damage the power supply and");
-      tft.println("coil.");
+      tft.println("Even if this channel isn't mapped, it must not be");
+      tft.println("shorted, as that can damage the power supply,");
+      tft.println("slave board, and/or solenoid.");
       tft.println();
-      tft.println("Check the INI file has the correct settings.");
+      tft.println("Check the solenoid and wiring for damage.");
       tft.println("Remove all power before retrying.");
       halt_system();
     }
   }
-
-  // Verify all used channels on this slave are working
-  // TODO: this
 
   // Check all mapped notes to ensure they are working
   for (uint8_t note(0); note < (sizeof(note_map) / sizeof(note_map[0])); ++note)
@@ -1268,6 +1235,37 @@ void validate_slave_status(const uint8_t& slave, const slave_status& status)
   }
 }
 
+void next_slave()
+{
+  current_slave++;
+  if (current_slave >= slaves_found)
+  {
+    current_slave = 0;
+  }
+}
+
+void ps_update()
+{
+  if (ps_en_timer > ps_en_toggle_time)
+  {
+    // Just reset the timer. A bit of jitter isn't a problem, but wind-up is.
+    ps_en_timer = 0;
+
+    // Toggle PS_EN state?
+    if (ps_enabled)
+    {
+      ps_en_high = !ps_en_high;
+    }
+    else
+    {
+      ps_en_high = false;
+    }
+
+    // Write to the pin
+    digitalWrite(ps_en_pin, ps_en_high ? HIGH : LOW);
+  }
+}
+
 void power_activity()
 {
   // Wake system
@@ -1308,9 +1306,6 @@ void power_state_update()
   // Waking up
   else if (power_state == sleep_to_awake_transition)
   {
-    // Turn on power supply (it needs to stabilize)
-    ps_enabled = true;
-
     // Raise backlight & wait for PS to stabilize
     if (sleep_timer >= 1)
     {
