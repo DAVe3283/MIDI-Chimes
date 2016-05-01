@@ -26,7 +26,7 @@ public:
     slave_status(const uint8_t* buffer, const size_t& buffer_len);
     ~slave_status();
 
-        // Load slave state into the class
+    // Load slave state into the class
     void load_slave_status(const uint8_t* buffer, const size_t& buffer_len);
 
     // Is the slave status valid
@@ -52,6 +52,9 @@ public:
 
     // Gets the last measured voltage on the specified channel
     float channel_voltage(const uint8_t& channel) const;
+
+    // Prints a channel state to the specified output
+    static void print_channel_state(Print& out, const channel_state_t& state);
 
 private:
     // Internal validation status

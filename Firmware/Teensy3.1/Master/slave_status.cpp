@@ -154,4 +154,30 @@ float slave_status::channel_voltage(const uint8_t& channel) const
     return static_cast<float>(channel_voltage_buffer[channel]) / 1000.0f;
 }
 
+void slave_status::print_channel_state(Print& out, const channel_state_t& state)
+{
+    switch (state)
+    {
+    case channel_working:
+        out.print("Working Normally");
+        break;
+
+    case channel_disconnected:
+        out.print("Disconnected / Solenoid Not Found");
+        break;
+
+    case channel_failed_short:
+        out.print("Short-Circuited");
+        break;
+
+    case channel_failed_open:
+        out.print("Failed Open-Circuit");
+        break;
+
+    default:
+        out.print("Unknown / Invalid Channel Status");
+        break;
+    }
+}
+
 } // namespace midi_chimes

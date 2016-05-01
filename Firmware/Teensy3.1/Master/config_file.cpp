@@ -9,7 +9,7 @@ const char calibration_section[] = "Calibration";
 
 // Local file globals
 const char split_tokens[] = " ,";
-char slave_key_buffer[] = "Slave12";
+char slave_key_buffer[] = "Slave13";
 
 // Note name to number map
 const char* note_names[128] =
@@ -50,7 +50,7 @@ bool config_file::get_slave_count(int8_t& slave_count)
     slave_count = 0;
     for (int slave = 0; slave < max_slaves; ++slave)
     {
-        sprintf(slave_key_buffer + 5, "%d", slave);
+        sprintf(slave_key_buffer + 5, "%d", slave + 1);
         if (ini.getValue(note_section, slave_key_buffer, ini_buffer, ini_buffer_len))
         {
             slave_count++;
@@ -67,7 +67,7 @@ bool config_file::get_slave_count(int8_t& slave_count)
 bool config_file::get_slave_notes(const int8_t& slave_no, int8_t notes[10])
 {
     // Get INI setting name
-    sprintf(slave_key_buffer + 5, "%d", slave_no);
+    sprintf(slave_key_buffer + 5, "%d", slave_no + 1);
 
     // Get INI setting value
     if (!ini.getValue(note_section, slave_key_buffer, ini_buffer, ini_buffer_len))
