@@ -115,8 +115,7 @@ slave_note_map note_map[128] = {};
 const size_t notes_per_slave(10);
 
 // Duty Cycle Settings
-// This matches the slaves, and isn't directly used by the master
-const uint8_t pwm_bits(12); // 0 - 4095
+const uint8_t pwm_bits(12); // 0 - 4095 <-- must match slaves!
 const float minimum_pwm(0.55f); // 55%, lowest reliable impact to produce a chime
 const uint16_t maximum_dc((1 << pwm_bits) - 1);
 const uint16_t minimum_dc(minimum_pwm * maximum_dc);
@@ -1162,7 +1161,7 @@ uint8_t i2c_addr_auto_assign()
 bool i2c_check_ack(const uint8_t& address)
 {
   // Look for a single ACK byte
-  if (Wire1.requestFrom(address, 1, I2C_STOP, 100) == 1) // We got 1 byte
+  if (Wire1.requestFrom(address, 1, I2C_STOP, 200) == 1) // We got 1 byte
   {
     // Is the byte an ACK?
     return (Wire1.read() == i2c_slave_ack);
@@ -1233,7 +1232,8 @@ bool get_slave_status(const uint8_t& address, slave_status& state)
   uint8_t buffer[expected_status_size];
 
   // Request the status
-  const size_t status_size(Wire1.requestFrom(address, expected_status_size, I2C_STOP, 1000));
+  const size_t status_size(Wire1.requestFrom(address, expected_status_size, I2C_STOP, 5000));
+  // Returned data length is always <= requested length, so no worry of a buffer overflow
   for (size_t i(0); i < status_size; ++i)
   {
     buffer[i] = Wire1.read();
