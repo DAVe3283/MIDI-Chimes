@@ -85,7 +85,7 @@ const float transistor_Vce_drop(  1.1f); // Transistor V_CE when on with my coil
 const float connected_min_voltage(0.1f); // Voltages above this at startup are considered connected
 const float shorted_voltage(      1.5f); // Voltages below this are considered shorted (regardless of ps_setpoint)
 // Error limits (determined experimentally)
-const float max_error_percent(          0.20f); // Max error (ideal - real feedback) as a % of ps_setpoint before evaluating shorts/opens
+const float max_error_percent(          0.03f); // Max error (ideal - real feedback) as a % of ps_setpoint before evaluating shorts/opens
 const float shorted_percent_ps_setpoint(0.95f); // Voltages lower than this % of ps_setpoint when commanded off are considered shorted
 const float open_percent_ps_setpoint(   0.98f); // Voltages higher than this % of ps_setpoint when commanded on are considered open circuit
 
