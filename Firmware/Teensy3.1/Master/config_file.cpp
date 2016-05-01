@@ -3,9 +3,10 @@
 namespace midi_chimes
 {
 
-// Setting file section names
+// Setting names
 const char note_section[] = "Notes";
 const char calibration_section[] = "Calibration";
+const char calibration_min_name[] = "Minimum_PWM";
 
 // Local file globals
 const char split_tokens[] = " ,";
@@ -29,6 +30,7 @@ const char* note_names[128] =
 
 config_file::config_file(const char* filename)
     : ini(filename)
+    , calibration_min_default(0.0f)
     , ini_buffer {}
 {}
 
@@ -43,6 +45,19 @@ bool config_file::open()
 bool config_file::validate()
 {
     return ini.validate(ini_buffer, ini_buffer_len);
+}
+
+bool config_file::load_globals()
+{
+    // Load the minimum calibration PWM %
+    if (ini.getValue(calibration_section, calibration_min_name, ini_buffer, ini_buffer_len))
+    {
+        return parse_percentage(ini_buffer, calibration_min_default);
+    }
+    else
+    {
+        return false;
+    }
 }
 
 bool config_file::get_slave_count(int8_t& slave_count)
@@ -98,11 +113,17 @@ bool config_file::get_slave_notes(const int8_t& slave_no, int8_t notes[10])
     return true;
 }
 
-bool config_file::get_note_calibration(const int8_t& note, float& calibration)
+bool config_file::get_note_calibration(const int8_t& note, float& min, float& max)
+{
+    const bool got_cal_min(get_note_calibration_min(note, min));
+    const bool got_cal_max(get_note_calibration_min(note, min));
+    return got_cal_min || got_cal_max;
+}
+bool config_file::get_note_calibration_min(const int8_t& note, float& calibration)
 {
     // Try and lookup by note number
-    char buffer[5];
-    sprintf(buffer, "%d", note);
+    char buffer[9]; // Worst case: "C#-1_Min"
+    sprintf(buffer, "%d_Min", note);
     if (ini.getValue(calibration_section, buffer, ini_buffer, ini_buffer_len))
     {
         // Parse the value
@@ -115,7 +136,35 @@ bool config_file::get_note_calibration(const int8_t& note, float& calibration)
     {
         return false;
     }
-    if (ini.getValue(calibration_section, note_name, ini_buffer, ini_buffer_len))
+    sprintf(buffer, "%s_Min", note_name);
+    if (ini.getValue(calibration_section, buffer, ini_buffer, ini_buffer_len))
+    {
+        // Parse the value
+        return parse_percentage(ini_buffer, calibration);
+    }
+
+    // Couldn't find a calibration
+    return false;
+}
+bool config_file::get_note_calibration_max(const int8_t& note, float& calibration)
+{
+    // Try and lookup by note number
+    char buffer[9]; // Worst case: "C#-1_Max"
+    sprintf(buffer, "%d_Max", note);
+    if (ini.getValue(calibration_section, buffer, ini_buffer, ini_buffer_len))
+    {
+        // Parse the value
+        return parse_percentage(ini_buffer, calibration);
+    }
+
+    // Try and lookup by note name
+    const char* note_name(lookup_note_name(note));
+    if (!note_name)
+    {
+        return false;
+    }
+    sprintf(buffer, "%s_Max", note_name);
+    if (ini.getValue(calibration_section, buffer, ini_buffer, ini_buffer_len))
     {
         // Parse the value
         return parse_percentage(ini_buffer, calibration);
@@ -284,7 +333,7 @@ bool config_file::parse_percentage(char* str, float& percentage)
     }
 
     // Parse string
-    percentage = atof(str) / 100.0;
+    percentage = atof(str) / 100.0f;
     return true;
 }
 

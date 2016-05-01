@@ -19,8 +19,9 @@ struct slave_note_map
     // Channel (port) on the slave for this note
     uint8_t channel = 0;
 
-    // Calibration value for this note
-    float calibration = 1.0;
+    // Calibration values for this note
+    float calibration_min = 0.0f;
+    float calibration_max = 1.0f;
 };
 
 class config_file
@@ -35,6 +36,9 @@ public:
     // Validate the INI file
     bool validate();
 
+    // Load global / required values
+    bool load_globals();
+
     // Get the number of slave configs in the INI file
     bool get_slave_count(int8_t& slave_count);
 
@@ -42,7 +46,9 @@ public:
     bool get_slave_notes(const int8_t& slave_no, int8_t notes[10]);
 
     // Get the calibration (0.0 - 1.0) for the given note, if present in the INI
-    bool get_note_calibration(const int8_t& note, float& calibration);
+    bool get_note_calibration(const int8_t& note, float& min, float& max);
+    bool get_note_calibration_min(const int8_t& note, float& calibration);
+    bool get_note_calibration_max(const int8_t& note, float& calibration);
 
     // Print the INI error message from the errNo provided
     static void print_ini_error_message(Print& display, const uint8_t& errNo, bool eol = true);
@@ -56,6 +62,9 @@ public:
 private:
     // Holds the INI file used to store config settings
     IniFile ini;
+
+    // Default minimum PWM %
+    float calibration_min_default;
 
     // Buffer for reading INI file
     const static size_t ini_buffer_len = 84;

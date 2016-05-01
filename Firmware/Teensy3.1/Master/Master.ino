@@ -119,9 +119,7 @@ const float minimum_ps_voltage(10.0f); // Minimum voltage to consider PS working
 
 // Duty Cycle Settings
 const uint8_t pwm_bits(12); // 0 - 4095 <-- must match slaves!
-const float minimum_pwm(0.55f); // 55%, lowest reliable impact to produce a chime
 const uint16_t maximum_dc((1 << pwm_bits) - 1);
-const uint16_t minimum_dc(minimum_pwm * maximum_dc);
 
 // Pins
 const uint8_t spi_mosi_pin(11);
@@ -154,9 +152,9 @@ const uint16_t ts_max_y(4000);
 // Timeouts
 const uint32_t blink_time(20000); // microseconds
 const uint32_t ps_en_toggle_time(1000); // microseconds
-const uint32_t ps_settle_time(2500); // milliseconds
+const uint32_t ps_settle_time(500); // milliseconds
 const uint32_t slave_post_timeout(3000); // milliseconds (after ps_settle_time)
-const uint32_t sleep_time(5 * 1000); // milliseconds
+const uint32_t sleep_time(5 * /*60 **/ 1000); // milliseconds
 
 // Backlight brightness
 const uint16_t lcd_bl_pwm_max(0xFFFF);
@@ -474,6 +472,15 @@ void setup()
     settings.print_ini_error_message(tft);
     halt_system();
   }
+  if (!settings.load_globals())
+  {
+    draw_BSOD(tft);
+    tft.print("INI file ");
+    tft.print(ini_filename);
+    tft.println(" is missing critical data.");
+    tft.println("Ensure the INI file has all sections and required values.");
+    halt_system();
+  }
   UG_ConsolePutString("done.\n");
 
   // Load configuration
@@ -510,12 +517,10 @@ void setup()
       }
       note_map[note].slave_address = i2c_slave_base_address + slave;
       note_map[note].channel = channel;
-      // Load calibration
-      float calibration;
-      if (settings.get_note_calibration(note, calibration))
-      {
-        note_map[note].calibration = calibration;
-      }
+      settings.get_note_calibration(
+        note,
+        note_map[note].calibration_min,
+        note_map[note].calibration_max);
     }
   }
   UG_ConsolePutString("done.\n");
@@ -867,8 +872,13 @@ uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note)
   // TODO: it might be worth re-working all the math as int32, as it might be
   //       faster than floats. But it might not matter.
 
-  // Calculate requested velocity
+  // Handle calibration for this note
+  const float& cal_min(note_map[note].calibration_min);
+  const float& cal_max(note_map[note].calibration_max);
+  const uint16_t minimum_dc(cal_min * static_cast<float>(maximum_dc));
   const float range(maximum_dc - minimum_dc);
+
+  // Calculate requested velocity
   float requested_volume(static_cast<float>(midi_velocity & 0x7F) / 127.0f);
 
   // Handle master volume
@@ -883,11 +893,8 @@ uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note)
     requested_volume *= static_cast<float>(master_volume) / 100.0f;
   }
 
-  // Handle calibration
-  const float& calibration(note_map[note].calibration);
-
   // Calculate final velocity DC value
-  const uint16_t velocity(minimum_dc + (range * requested_volume * calibration));
+  const uint16_t velocity(minimum_dc + (range * requested_volume * cal_max));
   return velocity;
 }
 
