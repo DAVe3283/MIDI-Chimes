@@ -144,7 +144,7 @@ const uint32_t ps_en_toggle_time(1000); // microseconds
 const uint32_t ps_settle_time(500); // milliseconds
 const uint32_t slave_post_timeout(3000); // milliseconds (after ps_settle_time)
 const uint32_t slave_status_interval(1000); // milliseconds
-const uint32_t sleep_time(5 * /*60 **/ 1000); // milliseconds
+const uint32_t sleep_time(5 * 60 * 1000); // milliseconds
 
 // Backlight brightness
 const uint16_t lcd_bl_pwm_max(0xFFFF);
@@ -1170,40 +1170,13 @@ void validate_slave_config(const uint8_t& slave, const slave_status& status)
     tft.println();
     tft.println("Please verify all cables are connected securely, &");
     tft.println("the slave has at least one chime connected.");
+    tft.println("All slaves must have the ground wire connected.");
     halt_system();
   }
 }
 
 void validate_slave_status(const uint8_t& slave, const slave_status& status)
 {
-  // Verify no channels are shorted
-  for (uint8_t channel(0); channel < notes_per_slave; ++channel)
-  {
-    const channel_state_t state(status.channel_state(channel));
-    if (state == channel_failed_short)
-    {
-      draw_BSOD(tft);
-      tft.println("Shorted channel found!");
-      tft.print("Slave:   ");
-      tft.println(slave + 1);
-      tft.print("Channel: ");
-      tft.println(channel + 1);
-      tft.print("Status:  ");
-      tft.print(static_cast<uint8_t>(state), DEC);
-      tft.print(" (");
-      slave_status::print_channel_state(tft, state);
-      tft.println(")");
-      tft.println();
-      tft.println("Even if this channel isn't mapped, it must not be");
-      tft.println("shorted, as that can damage the power supply,");
-      tft.println("slave board, and/or solenoid.");
-      tft.println();
-      tft.println("Check the solenoid and wiring for damage.");
-      tft.println("Remove all power before retrying.");
-      halt_system();
-    }
-  }
-
   // Check all mapped notes to ensure they are working
   for (uint8_t note(0); note < (sizeof(note_map) / sizeof(note_map[0])); ++note)
   {
@@ -1243,10 +1216,39 @@ void validate_slave_status(const uint8_t& slave, const slave_status& status)
         tft.println(")");
         tft.println();
         tft.println("Check the solenoid cable is attached correctly.");
+        tft.println("Check the solenoid and wiring for damage.");
         tft.println("Check the INI file has the correct settings.");
         tft.println("Remove all power before retrying.");
         halt_system();
       }
+    }
+  }
+
+  // Verify no channels are shorted (even if they aren't mapped)
+  for (uint8_t channel(0); channel < notes_per_slave; ++channel)
+  {
+    const channel_state_t state(status.channel_state(channel));
+    if (state == channel_failed_short)
+    {
+      draw_BSOD(tft);
+      tft.println("Shorted channel found!");
+      tft.print("Slave:   ");
+      tft.println(slave + 1);
+      tft.print("Channel: ");
+      tft.println(channel + 1);
+      tft.print("Status:  ");
+      tft.print(static_cast<uint8_t>(state), DEC);
+      tft.print(" (");
+      slave_status::print_channel_state(tft, state);
+      tft.println(")");
+      tft.println();
+      tft.println("Even if this channel isn't mapped, it must not be");
+      tft.println("shorted, as that can damage the power supply,");
+      tft.println("slave board, and/or solenoid.");
+      tft.println();
+      tft.println("Check the solenoid and wiring for damage.");
+      tft.println("Remove all power before retrying.");
+      halt_system();
     }
   }
 }
