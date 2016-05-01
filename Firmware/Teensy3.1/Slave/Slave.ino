@@ -370,35 +370,12 @@ void loop()
       usb.println(i2c_address, HEX);
       usb.println();
       usb.println("Commands:");
-      usb.println("    s   = Display status");
+      usb.println("    S   = Display status");
       usb.println("    1-9 = Set debug output to the specified level");
       usb.println("    0   = Disable debug output");
-      usb.println();
-      break;
-
-    // Select USB debug output level
-    case '0':
-    case '1':
-    case '2':
-    case '3':
-    case '4':
-    case '5':
-    case '6':
-    case '7':
-    case '8':
-    case '9':
-      debug_level = incomingByte - '0';
-      usb.print("USB debug ");
-      if (debug_level > 0)
-      {
-        usb.print("ENABLED (Level ");
-        usb.print(debug_level);
-        usb.println(").");
-      }
-      else
-      {
-        usb.println("DISABLED.");
-      }
+      usb.println("    J   = Force channel 1 to channel_disconnected");
+      usb.println("    K   = Force channel 1 to channel_failed_short");
+      usb.println("    L   = Force channel 1 to channel_failed_open");
       usb.println();
       break;
 
@@ -437,6 +414,49 @@ void loop()
         usb.println(")");
       }
       usb.println();
+      break;
+
+    // Select USB debug output level
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+      debug_level = incomingByte - '0';
+      usb.print("USB debug ");
+      if (debug_level > 0)
+      {
+        usb.print("ENABLED (Level ");
+        usb.print(debug_level);
+        usb.println(").");
+      }
+      else
+      {
+        usb.println("DISABLED.");
+      }
+      usb.println();
+      break;
+
+    // Force channel 1 state
+    case 'j':
+    case 'J':
+      usb.println("Forced channel 1 state to channel_disconnected.");
+      channel_state[0] = channel_disconnected;
+      break;
+    case 'k':
+    case 'K':
+      usb.println("Forced channel 1 state to channel_failed_short.");
+      handle_shorted(0);
+      break;
+    case 'l':
+    case 'L':
+      usb.println("Forced channel 1 state to channel_failed_open.");
+      channel_state[0] = channel_failed_open;
       break;
 
     // Unknown commands
