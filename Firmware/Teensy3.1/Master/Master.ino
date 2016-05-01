@@ -143,6 +143,7 @@ const uint32_t blink_time(20000); // microseconds
 const uint32_t ps_en_toggle_time(1000); // microseconds
 const uint32_t ps_settle_time(500); // milliseconds
 const uint32_t slave_post_timeout(3000); // milliseconds (after ps_settle_time)
+const uint32_t slave_status_interval(1000); // milliseconds
 const uint32_t sleep_time(5 * /*60 **/ 1000); // milliseconds
 
 // Backlight brightness
@@ -311,6 +312,7 @@ size_t doorbell_song_index(0); // Used to play through the hard coded song, will
 elapsedMicros ps_en_timer;
 elapsedMillis sleep_timer;
 elapsedMillis doorbell_timer;
+elapsedMillis slave_status_timer;
 
 // Serial IO
 HardwareSerial midi = HardwareSerial();
@@ -637,6 +639,20 @@ void loop()
 
   // Handle power supply
   ps_update();
+
+  // Check slave status (only while awake)
+  if ((power_state == awake) && (slave_status_timer >= slave_status_interval))
+  {
+    // Reset the timer
+    slave_status_timer = 0;
+
+    // Determine what slave to work with
+    const uint8_t address(i2c_slave_base_address + current_slave);
+    slave_status status;
+    get_slave_status(address, status);
+    validate_slave_status(current_slave, status);
+    next_slave();
+  }
 
   // Handle USB MIDI messages
   usbMIDI.read();
