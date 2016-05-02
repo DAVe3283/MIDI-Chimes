@@ -116,7 +116,7 @@ bool config_file::get_slave_notes(const int8_t& slave_no, int8_t notes[10])
 bool config_file::get_note_calibration(const int8_t& note, float& min, float& max)
 {
     const bool got_cal_min(get_note_calibration_min(note, min));
-    const bool got_cal_max(get_note_calibration_min(note, min));
+    const bool got_cal_max(get_note_calibration_max(note, max));
     return got_cal_min || got_cal_max;
 }
 bool config_file::get_note_calibration_min(const int8_t& note, float& calibration)
@@ -127,23 +127,29 @@ bool config_file::get_note_calibration_min(const int8_t& note, float& calibratio
     if (ini.getValue(calibration_section, buffer, ini_buffer, ini_buffer_len))
     {
         // Parse the value
-        return parse_percentage(ini_buffer, calibration);
+        if (parse_percentage(ini_buffer, calibration))
+        {
+            return true;
+        }
     }
 
     // Try and lookup by note name
     const char* note_name(lookup_note_name(note));
-    if (!note_name)
+    if (note_name)
     {
-        return false;
-    }
-    sprintf(buffer, "%s_Min", note_name);
-    if (ini.getValue(calibration_section, buffer, ini_buffer, ini_buffer_len))
-    {
-        // Parse the value
-        return parse_percentage(ini_buffer, calibration);
+        sprintf(buffer, "%s_Min", note_name);
+        if (ini.getValue(calibration_section, buffer, ini_buffer, ini_buffer_len))
+        {
+            // Parse the value
+            if (parse_percentage(ini_buffer, calibration))
+            {
+                return true;
+            }
+        }
     }
 
-    // Couldn't find a calibration
+    // Couldn't find a calibration, use the default
+    calibration = calibration_min_default;
     return false;
 }
 bool config_file::get_note_calibration_max(const int8_t& note, float& calibration)
@@ -154,20 +160,25 @@ bool config_file::get_note_calibration_max(const int8_t& note, float& calibratio
     if (ini.getValue(calibration_section, buffer, ini_buffer, ini_buffer_len))
     {
         // Parse the value
-        return parse_percentage(ini_buffer, calibration);
+        if (parse_percentage(ini_buffer, calibration))
+        {
+            return true;
+        }
     }
 
     // Try and lookup by note name
     const char* note_name(lookup_note_name(note));
-    if (!note_name)
+    if (note_name)
     {
-        return false;
-    }
-    sprintf(buffer, "%s_Max", note_name);
-    if (ini.getValue(calibration_section, buffer, ini_buffer, ini_buffer_len))
-    {
-        // Parse the value
-        return parse_percentage(ini_buffer, calibration);
+        sprintf(buffer, "%s_Max", note_name);
+        if (ini.getValue(calibration_section, buffer, ini_buffer, ini_buffer_len))
+        {
+            // Parse the value
+            if (parse_percentage(ini_buffer, calibration))
+            {
+                return true;
+            }
+        }
     }
 
     // Couldn't find a calibration

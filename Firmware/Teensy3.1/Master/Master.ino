@@ -2,7 +2,7 @@
 // Master.ino
 //
 // The master Teensy that runs the MIDI chimes.
-// This teensy is responsible for running the display, USB and physical MIDI,
+// This Teensy is responsible for running the display, USB and physical MIDI,
 // address auto-assignment, etc.
 //
 // TODO:
@@ -13,26 +13,13 @@
 // * doesn't have to deal with a hung MIDI device.
 // * This could from an I2C timeout, which I am not yet handling.
 // *****************************************************************************
-// * Actually implement master volume
-//   * Update master volume over MIDI
 // * See Notes/MIDI.md for channel, program, and OUT/THRU information.
-// * Implement I2C timeout (properly) & handle I2C errors
-//   * Probably need a very short timeout (1ms or less) to avoid messing up song
-//     * Or should we just throw a giant error and abort playback?
-//       We can only do this for SD card playback, though.
 // * Implement settings
 //   * Storing them in EEPROM is fine
 // * Handle MIDI program change events
 //   * We are technically Program 0xE "Tubular Bells"
 //   * We might want to handle other things, or everything on the channel?
-// * Handle MIDI Control Change messages
-//   * 0x07 is channel volume. Use that to adjust our volume
-// * Handle some System Exclusive messages
-//   * Master volume (F0 7F 7F 04 01 00 nn F7 where nn is volume 0-127)
-//     * This should probably be a setting, but it seems pretty safe.
 // * Make the display do useful things
-//   * Show errors
-//     * Periodically poll the slaves for status, report any errors
 //   * Show input source (USB or physical MIDI)
 //   * Options
 //     * Override velocity to master volume vs. scale velocity 0-master
@@ -183,6 +170,7 @@ const uint8_t midi_cmd_program_change(0xC0);
 const uint8_t midi_cmd_aftertouch_mono(0xD0);
 const uint8_t midi_cmd_pitch_bend(0xE0);
 const uint8_t midi_cmd_system_exclusive(0xF0);
+const uint8_t midi_cmd_end_exclusive(0xF7);
 
 // MIDI Programs (Instruments)
 const uint8_t midi_prog_tubular_bells(0xE);
@@ -212,6 +200,7 @@ void OnControlChange(uint8_t channel, uint8_t control, uint8_t value);
 void OnProgramChange(uint8_t channel, uint8_t program);
 // void OnAfterTouch(uint8_t channel, uint8_t pressure);
 // void OnPitchChange(uint8_t channel, int pitch);
+void OnSystemExclusive();
 
 // Scale a MIDI velocity (7-bit) to our 12-bit velocity
 uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note);
@@ -226,9 +215,10 @@ bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out,
 void adjust_master_volume(int8_t change); // Adjust up/down by the specified amount
 void set_master_volume(const int8_t& volume); // Set volume the specified value (0 - 100)
 
-// Auto-assign I2C addresses to slaves
-uint8_t i2c_addr_auto_assign();
-bool i2c_check_ack(const uint8_t& address);
+// I²C functions
+uint8_t i2c_addr_auto_assign(); // Auto-assign I2C addresses to slaves
+bool i2c_check_ack(const uint8_t& address); // Check for ack from slave
+void i2c_check_result(const uint8_t& i2c_result, const uint8_t& address, const int& line);
 
 // Doorbell Functions
 void doorbell_isr(); // Doorbell physically pressed
@@ -303,6 +293,11 @@ uint16_t backlight_pwm(lcd_bl_pwm_max);
 
 // MIDI state
 bool play_this_program(true); // Do we play notes for the current program?
+bool midi_master_volume_14bit(false); // Is the master volume message 14-bit? (or just 7-bit)
+bool midi_receiving_system_exclusive(false); // Are we currently receiving a system exclusive message?
+uint8_t midi_system_exclusive_buffer[8] = {}; // Buffer long enough to hold the longest message we will handle
+const size_t midi_system_exclusive_buffer_size(sizeof(midi_system_exclusive_buffer) / sizeof(*midi_system_exclusive_buffer));
+size_t midi_system_exclusive_message_length(0); // Length of the last received system exclusive message (including start & end marker)
 
 // Doorbell
 volatile bool doorbell_pressed(false); // Set to true in ISR when the doorbell is pressed
@@ -653,7 +648,16 @@ void loop()
     // Determine what slave to work with
     const uint8_t address(i2c_slave_base_address + current_slave);
     slave_status status;
-    get_slave_status(address, status);
+    if (!get_slave_status(address, status))
+    {
+      draw_BSOD(tft);
+      tft.println("Lost communication with slave board!");
+      tft.print(  "Slave: ");
+      tft.println(current_slave + 1);
+      tft.println();
+      tft.println("Please verify all cables are connected securely.");
+      halt_system();
+    }
     validate_slave_status(current_slave, status);
     next_slave();
   }
@@ -668,6 +672,30 @@ void loop()
     power_activity();
 
     const uint8_t status(midi.peek());
+
+    // Handle MIDI system exclusive data
+    if (midi_receiving_system_exclusive)
+    {
+      midi.read(); // Drop the byte from the buffer
+
+      // Look for end of message
+      if (status == midi_cmd_end_exclusive)
+      {
+        midi_receiving_system_exclusive = false;
+        OnSystemExclusive(); // Process the message
+        continue;
+      }
+
+      // Store the message until the buffer is full
+      if (midi_system_exclusive_message_length < midi_system_exclusive_buffer_size)
+      {
+        midi_system_exclusive_buffer[midi_system_exclusive_message_length] = status;
+      }
+      midi_system_exclusive_message_length++;
+
+      // Move on to the next byte
+      continue;
+    }
 
     // Drop non-command data until the buffer starts with a command
     if (status < 0x80) // All command bytes start with a 1
@@ -697,6 +725,11 @@ void loop()
     case midi_cmd_program_change:
     case midi_cmd_aftertouch_mono:
       required_data_bytes = 1;
+      break;
+
+    // System Exclusive
+    case midi_cmd_system_exclusive:
+      required_data_bytes = 0; // We start dumping it to a buffer
       break;
 
     // Unknown commands
@@ -746,6 +779,12 @@ void loop()
       // Program change
       case midi_cmd_program_change:
         OnProgramChange(channel, midi_buffer[0]);
+        break;
+
+      // System Exclusive
+      case midi_cmd_system_exclusive:
+        midi_receiving_system_exclusive = true;
+        midi_system_exclusive_message_length = 0;
         break;
 
       // Not implemented
@@ -887,6 +926,48 @@ void OnProgramChange(uint8_t channel, uint8_t program)
   }
 }
 
+void OnSystemExclusive()
+{
+  // Verify length
+  if (midi_system_exclusive_message_length > midi_system_exclusive_buffer_size)
+  {
+    // Can't do anything with part of a message
+    return;
+  }
+
+  // Handle Master Volume message
+  // http://www.recordingblogs.com/sa/tabid/88/Default.aspx?topic=MIDI+Master+Volume+message
+  if ((midi_system_exclusive_message_length == 6) &&  // Expected length is 6 + start & end commands
+      (midi_system_exclusive_buffer[0] == 0x7F) &&    // Realtime
+      (midi_system_exclusive_buffer[1] == 0x7F) &&    // SysEx channel, 0x7F means all/disregard
+      (midi_system_exclusive_buffer[2] == 0x04) &&    // Sub-ID - Device Control
+      (midi_system_exclusive_buffer[3] == 0x01))      // Sub-ID - Master Volume
+  {
+    // const uint8_t system_exclusive_channel(midi_system_exclusive_buffer[1]);
+    const uint16_t volume_lower_bits(midi_system_exclusive_buffer[4] & 0x7F);
+    const uint16_t volume_upper_bits(midi_system_exclusive_buffer[5] & 0x7F);
+
+    // Check for 14-bit resolution
+    if (volume_lower_bits)
+    {
+      midi_master_volume_14bit = true;
+    }
+
+    // Set volume
+    if (midi_master_volume_14bit)
+    {
+      // 14-bit
+      const uint16_t volume_14bit((volume_upper_bits << 7) & volume_lower_bits);
+      set_master_volume(volume_14bit * 100 / ((1 << 14) - 1));
+    }
+    else
+    {
+      // 7- bit
+      set_master_volume(volume_upper_bits * 100 / ((1 << 7) - 1));
+    }
+  }
+}
+
 uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note)
 {
   // Don't worry about MIDI velocity == 0, that must be taken care of before we
@@ -899,7 +980,7 @@ uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note)
   const float& cal_min(note_map[note].calibration_min);
   const float& cal_max(note_map[note].calibration_max);
   const uint16_t minimum_dc(cal_min * static_cast<float>(maximum_dc));
-  const float range(maximum_dc - minimum_dc);
+  const float range((cal_max * static_cast<float>(maximum_dc)) - static_cast<float>(minimum_dc));
 
   // Calculate requested velocity
   float requested_volume(static_cast<float>(midi_velocity & 0x7F) / 127.0f);
@@ -917,7 +998,7 @@ uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note)
   }
 
   // Calculate final velocity DC value
-  const uint16_t velocity(minimum_dc + (range * requested_volume * cal_max));
+  const uint16_t velocity(minimum_dc + (range * requested_volume));
   return velocity;
 }
 
@@ -931,7 +1012,8 @@ void send_chime(const uint8_t& address, const uint8_t& channel, const uint16_t& 
   // Send I2C message
   Wire1.beginTransmission(address);
   Wire1.write(buffer, sizeof(buffer));
-  Wire1.endTransmission();
+  uint8_t i2c_result(Wire1.endTransmission(I2C_STOP, 500));
+  i2c_check_result(i2c_result, address, __LINE__);
 }
 
 bool get_slave_and_channel(const uint8_t& midi_note, uint8_t& slave_address_out, uint8_t& slave_channel_out)
@@ -1019,7 +1101,7 @@ uint8_t i2c_addr_auto_assign()
   Wire1.beginTransmission(0);
   Wire1.write(0x00); // Command = Set Address
   Wire1.write(slave_address);
-  Wire1.endTransmission();
+  Wire1.endTransmission(I2C_STOP, 300);
 
   // Latch address
   digitalWrite(addr_latch_pin, HIGH);
@@ -1040,18 +1122,18 @@ uint8_t i2c_addr_auto_assign()
     Wire1.beginTransmission(0);
     Wire1.write(0x00); // Command = Set Address
     Wire1.write(slave_address);
-    Wire1.endTransmission();
+    Wire1.endTransmission(I2C_STOP, 300);
 
     // Ask previous slave to latch the current slave for us
     Wire1.beginTransmission(slave_address - 1);
     Wire1.write(0x01); // Command = Set ADDR_LATCH
     Wire1.write(HIGH);
-    Wire1.endTransmission();
+    Wire1.endTransmission(I2C_STOP, 300);
     delayMicroseconds(slave_latch_delay);
     Wire1.beginTransmission(slave_address - 1);
     Wire1.write(0x01); // Command = Set ADDR_LATCH
     Wire1.write(LOW);
-    Wire1.endTransmission();
+    Wire1.endTransmission(I2C_STOP, 300);
 
     // Check for ACK
     gotSlave = i2c_check_ack(slave_address++);
@@ -1067,7 +1149,8 @@ uint8_t i2c_addr_auto_assign()
     Wire1.beginTransmission(i2c_slave_base_address + i);
     Wire1.write(0x02); // Command = Startup Complete
     Wire1.write(0x00); // Don't care
-    Wire1.endTransmission();
+    uint8_t i2c_result((Wire1.endTransmission(I2C_STOP, 300));
+    i2c_check_result(i2c_result, i2c_slave_base_address + i, __LINE__);
   }
 
   // Done!
@@ -1084,6 +1167,25 @@ bool i2c_check_ack(const uint8_t& address)
   }
 
   return false;
+}
+
+void i2c_check_result(const uint8_t& i2c_result, const uint8_t& address, const int& line)
+{
+  if (i2c_result)
+  {
+    draw_BSOD(tft);
+    tft.println("I\xFC""C transmission failed!");
+    tft.print("Address: 0x");
+    tft.print(address, HEX);
+    tft.print(" (Slave ");
+    tft.print(address - i2c_slave_base_address);
+    tft.println(")");
+    tft.print("Result: ");
+    tft.println(i2c_result);
+    tft.print("Line:   ");
+    tft.println(line);
+    halt_system();
+  }
 }
 
 void doorbell_isr()
