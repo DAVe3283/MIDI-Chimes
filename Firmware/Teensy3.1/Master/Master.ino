@@ -6,13 +6,7 @@
 // address auto-assignment, etc.
 //
 // TODO:
-// *****************************************************************************
-// * USB MIDI locks up (including host PC playback application) when a slave
-// * doesn't work as expected (i.e. unplugged.)
-// * Find out why, and make the master handle this gracefully, so the host PC
-// * doesn't have to deal with a hung MIDI device.
-// * This could from an I2C timeout, which I am not yet handling.
-// *****************************************************************************
+// * Limit max simultaneous chime strikes to avoid overloading PSU
 // * See Notes/MIDI.md for channel, program, and OUT/THRU information.
 // * Implement settings
 //   * Storing them in EEPROM is fine
@@ -200,7 +194,9 @@ void OnControlChange(uint8_t channel, uint8_t control, uint8_t value);
 void OnProgramChange(uint8_t channel, uint8_t program);
 // void OnAfterTouch(uint8_t channel, uint8_t pressure);
 // void OnPitchChange(uint8_t channel, int pitch);
-void OnSystemExclusive();
+void OnSystemExclusive(const uint8_t* data, uint16_t length, bool complete);
+// void OnRealTimeSystem(uint8_t realtimebyte);
+// void OnTimeCodeQuarterFrame(uint16_t data);
 
 // Scale a MIDI velocity (7-bit) to our 12-bit velocity
 uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note);
@@ -216,7 +212,7 @@ void adjust_master_volume(int8_t change); // Adjust up/down by the specified amo
 void set_master_volume(const int8_t& volume); // Set volume the specified value (0 - 100)
 
 // I²C functions
-uint8_t i2c_addr_auto_assign(); // Auto-assign I2C addresses to slaves
+uint8_t i2c_addr_auto_assign(); // Auto-assign I²C addresses to slaves
 bool i2c_check_ack(const uint8_t& address); // Check for ack from slave
 void i2c_check_result(const uint8_t& i2c_result, const uint8_t& address, const int& line);
 
@@ -294,10 +290,10 @@ uint16_t backlight_pwm(lcd_bl_pwm_max);
 // MIDI state
 bool play_this_program(true); // Do we play notes for the current program?
 bool midi_master_volume_14bit(false); // Is the master volume message 14-bit? (or just 7-bit)
-bool midi_receiving_system_exclusive(false); // Are we currently receiving a system exclusive message?
-uint8_t midi_system_exclusive_buffer[8] = {}; // Buffer long enough to hold the longest message we will handle
-const size_t midi_system_exclusive_buffer_size(sizeof(midi_system_exclusive_buffer) / sizeof(*midi_system_exclusive_buffer));
-size_t midi_system_exclusive_message_length(0); // Length of the last received system exclusive message (including start & end marker)
+bool midi_receiving_sysex(false); // Are we currently receiving a system exclusive message?
+uint8_t midi_sysex_buffer[8] = {}; // Buffer long enough to hold the longest message we will handle
+const size_t midi_sysex_buffer_size(sizeof(midi_sysex_buffer) / sizeof(*midi_sysex_buffer));
+size_t midi_sysex_message_length(0); // Length of the last received system exclusive message (including start & end marker)
 
 // Doorbell
 volatile bool doorbell_pressed(false); // Set to true in ISR when the doorbell is pressed
@@ -322,7 +318,7 @@ SdFile dirFile;
 // Touch Screen
 ILI9341_t3 tft = ILI9341_t3(lcd_cs_pin, lcd_dc_pin, lcd_reset_pin, spi_mosi_pin, spi_sck_pin, spi_miso_pin); // TFT LCD
 #ifdef CAPACITIVE_TS
-  Adafruit_FT6206 ts = Adafruit_FT6206();  // Using default Arduino I2C pins?
+  Adafruit_FT6206 ts = Adafruit_FT6206();  // Using default Arduino I²C pins?
 #else
   Adafruit_STMPE610 ts = Adafruit_STMPE610(touch_cs_pin); // Touch sensor
 #endif
@@ -435,7 +431,7 @@ void setup()
   }
   UG_ConsolePutString("done.\n");
 
-  // Configure I2C
+  // Configure I²C
   Wire1.begin(I2C_MASTER, 0, I2C_PINS_29_30, I2C_PULLUP_EXT, I2C_RATE_1000);
 
   // Initialize SD Card
@@ -606,6 +602,9 @@ void setup()
   usbMIDI.setHandleProgramChange(OnProgramChange);
   // usbMIDI.setHandleAfterTouch(OnAfterTouch); // Not needed (might for OUT/THRU?)
   // usbMIDI.setHandlePitchChange(OnPitchChange); // Not needed (might for OUT/THRU?)
+  usbMIDI.setHandleSysEx(OnSystemExclusive);
+  // usbMIDI.setHandleRealTimeSystem(OnRealTimeSystem); // Not needed (might for OUT/THRU?)
+  // usbMIDI.setHandleTimeCodeQuarterFrame(OnTimeCodeQuarterFrame); // Not needed (might for OUT/THRU?)
 
   // Configure hardware MIDI
   midi.begin(31250, SERIAL_8N1);
@@ -674,24 +673,28 @@ void loop()
     const uint8_t status(midi.peek());
 
     // Handle MIDI system exclusive data
-    if (midi_receiving_system_exclusive)
+    if (midi_receiving_sysex)
     {
       midi.read(); // Drop the byte from the buffer
 
       // Look for end of message
       if (status == midi_cmd_end_exclusive)
       {
-        midi_receiving_system_exclusive = false;
-        OnSystemExclusive(); // Process the message
+        midi_receiving_sysex = false;
+        const bool have_full_message(midi_sysex_message_length <= midi_sysex_buffer_size);
+        OnSystemExclusive(
+          midi_sysex_buffer,
+          have_full_message ? midi_sysex_message_length : midi_sysex_buffer_size,
+          have_full_message);
         continue;
       }
 
       // Store the message until the buffer is full
-      if (midi_system_exclusive_message_length < midi_system_exclusive_buffer_size)
+      if (midi_sysex_message_length < midi_sysex_buffer_size)
       {
-        midi_system_exclusive_buffer[midi_system_exclusive_message_length] = status;
+        midi_sysex_buffer[midi_sysex_message_length] = status;
       }
-      midi_system_exclusive_message_length++;
+      midi_sysex_message_length++;
 
       // Move on to the next byte
       continue;
@@ -783,8 +786,8 @@ void loop()
 
       // System Exclusive
       case midi_cmd_system_exclusive:
-        midi_receiving_system_exclusive = true;
-        midi_system_exclusive_message_length = 0;
+        midi_receiving_sysex = true;
+        midi_sysex_message_length = 0;
         break;
 
       // Not implemented
@@ -926,26 +929,26 @@ void OnProgramChange(uint8_t channel, uint8_t program)
   }
 }
 
-void OnSystemExclusive()
+void OnSystemExclusive(const uint8_t* data, uint16_t length, bool complete)
 {
-  // Verify length
-  if (midi_system_exclusive_message_length > midi_system_exclusive_buffer_size)
+  if (!complete)
   {
     // Can't do anything with part of a message
+    // We don't buffer larger messages; the buffer is sized for the largest message we expect
     return;
   }
 
   // Handle Master Volume message
   // http://www.recordingblogs.com/sa/tabid/88/Default.aspx?topic=MIDI+Master+Volume+message
-  if ((midi_system_exclusive_message_length == 6) &&  // Expected length is 6 + start & end commands
-      (midi_system_exclusive_buffer[0] == 0x7F) &&    // Realtime
-      (midi_system_exclusive_buffer[1] == 0x7F) &&    // SysEx channel, 0x7F means all/disregard
-      (midi_system_exclusive_buffer[2] == 0x04) &&    // Sub-ID - Device Control
-      (midi_system_exclusive_buffer[3] == 0x01))      // Sub-ID - Master Volume
+  if ((length == 6) &&      // Expected length is 6 + start & end commands
+      (data[0] == 0x7F) &&  // Realtime
+      (data[1] == 0x7F) &&  // SysEx channel, 0x7F means all/disregard
+      (data[2] == 0x04) &&  // Sub-ID - Device Control
+      (data[3] == 0x01))    // Sub-ID - Master Volume
   {
-    // const uint8_t system_exclusive_channel(midi_system_exclusive_buffer[1]);
-    const uint16_t volume_lower_bits(midi_system_exclusive_buffer[4] & 0x7F);
-    const uint16_t volume_upper_bits(midi_system_exclusive_buffer[5] & 0x7F);
+    // const uint8_t system_exclusive_channel(data[1]);
+    const uint16_t volume_lower_bits(data[4] & 0x7F);
+    const uint16_t volume_upper_bits(data[5] & 0x7F);
 
     // Check for 14-bit resolution
     if (volume_lower_bits)
@@ -1009,7 +1012,7 @@ void send_chime(const uint8_t& address, const uint8_t& channel, const uint16_t& 
   memcpy(buffer + 0, &channel, sizeof(uint8_t));
   memcpy(buffer + 1, &velocity, sizeof(uint16_t));
 
-  // Send I2C message
+  // Send I²C message
   Wire1.beginTransmission(address);
   Wire1.write(buffer, sizeof(buffer));
   uint8_t i2c_result(Wire1.endTransmission(I2C_STOP, 500));
@@ -1149,7 +1152,7 @@ uint8_t i2c_addr_auto_assign()
     Wire1.beginTransmission(i2c_slave_base_address + i);
     Wire1.write(0x02); // Command = Startup Complete
     Wire1.write(0x00); // Don't care
-    uint8_t i2c_result((Wire1.endTransmission(I2C_STOP, 300));
+    uint8_t i2c_result(Wire1.endTransmission(I2C_STOP, 300));
     i2c_check_result(i2c_result, i2c_slave_base_address + i, __LINE__);
   }
 
