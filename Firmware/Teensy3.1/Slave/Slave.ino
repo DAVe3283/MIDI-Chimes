@@ -85,7 +85,8 @@ const float transistor_Vce_drop(  1.1f); // Transistor V_CE when on with my coil
 const float connected_min_voltage(0.1f); // Voltages above this at startup are considered connected
 const float shorted_voltage(      1.5f); // Voltages below this are considered shorted (regardless of ps_setpoint)
 // Error limits (determined experimentally)
-const float max_error_percent(          0.03f); // Max error (ideal - real feedback) as a % of ps_setpoint before evaluating shorts/opens
+const float base_error(          0.02f); // Base allowed error during strike / settle
+const float per_strike_error(    0.02f); // Extra error allowed during strike for each additional coil on simultaneously
 const float shorted_percent_ps_setpoint(0.95f); // Voltages lower than this % of ps_setpoint when commanded off are considered shorted
 const float open_percent_ps_setpoint(   0.98f); // Voltages higher than this % of ps_setpoint when commanded on are considered open circuit
 
@@ -141,8 +142,14 @@ void measure_ps_voltage();
 // Strike a chime (handles thermals, settle time, etc.)
 void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle);
 
+// Count how many channels are currently striking
+uint8_t num_striking();
+
 // Read the voltage on the given channel
 float read_voltage(const uint8_t& channel);
+
+// Check if a channel is in the expected range
+bool is_in_range(const float& error);
 
 // Check channel for shorts
 bool is_shorted(const float& voltage);
@@ -790,6 +797,19 @@ void strike_chime(const uint8_t& channel, const uint16_t& duty_cycle)
   }
 }
 
+uint8_t num_striking()
+{
+  uint8_t count(0);
+  for (int channel(0); channel < num_channels; ++channel)
+  {
+    if (striking[channel])
+    {
+      count++;
+    }
+  }
+  return count;
+}
+
 float read_voltage(const uint8_t& channel)
 {
   const float analog_raw(analogRead(feedback_pins[channel]));
@@ -799,6 +819,12 @@ float read_voltage(const uint8_t& channel)
     * divider_ratio // times the divider
     * analog_raw / analog_max; // times the measured ratio
   return voltage;
+}
+
+bool is_in_range(const float& error)
+{
+  const float max_error(base_error + (per_strike_error * num_striking()));
+  return (error < max_error) && (error > -max_error);
 }
 
 bool is_shorted(const float& voltage)
@@ -846,7 +872,7 @@ bool verify_on(const uint8_t& channel)
   const float error((ideal_voltage - voltage) / ps_setpoint);
 
   // Verify transistor is in expected range
-  const bool in_range((error < max_error_percent) && (error > -max_error_percent));
+  const bool in_range(is_in_range(error));
   verified[channel] = true;
 
   // Handle failures (only when power supply is stable)
@@ -904,7 +930,7 @@ bool verify_off(const uint8_t& channel)
   const float error((ps_setpoint - ps_voltage[channel]) / ps_setpoint);
 
   // Verify transistor is in expected range
-  const bool in_range((error < max_error_percent) && (error > -max_error_percent));
+  const bool in_range(is_in_range(error));
   verified[channel] = true;
 
   // Handle failures (only when power supply is stable)
