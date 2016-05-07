@@ -823,7 +823,19 @@ float read_voltage(const uint8_t& channel)
 
 bool is_in_range(const float& error)
 {
-  const float max_error(base_error + (per_strike_error * num_striking()));
+  const uint8_t ns(num_striking());
+  const float max_error(base_error + (per_strike_error * ns));
+  if (debug_level >= 4)
+  {
+    usb.print("Error: ");
+    usb.print(error * 100.0f);
+    usb.println("%");
+    usb.print("Max E: ");
+    usb.print(max_error * 100.0f);
+    usb.println("%");
+    usb.print("Num S: ");
+    usb.println(ns);
+  }
   return (error < max_error) && (error > -max_error);
 }
 
