@@ -3,6 +3,8 @@
 One of the coils for the chime was overheated and damaged. It measured
 approximately half the impedance of the normal coils, and was visibly burnt.
 
+![Picture of the burnt coil](coil_burnt.jpg)
+
 The high current through this coil was causing problems for the transistor I
 selected for the driver board, so I decided to re-wind the coil.
 
@@ -26,6 +28,11 @@ Harbor Freight digital caliper. That puts it at a nominal 24 or 25 gauge.
 
 Total wire length removed is approximately 250' (measured with a tape measure).
 
+Calculating the expected resistance for 250' of 25 AWG wire yields 8.09 ohms,
+which matches the other coils (8.0 ohms on my meter).
+
+I think it is safe to say the coil uses **25 AWG** magnet wire.
+
 ## Core
 
 The coil core was then exposed, and was measured.
@@ -39,4 +46,16 @@ the original winding width, but it appeared to be about 22-25 mm wide.
 
 ## New Winding
 
-I need to order some appropriate magnet wire, then begin the winding process.
+I ordered 25 AWG magnet wire, and used my lathe to re-wind the burnt coil with
+new wire. I didn't have the proper paper for separating layers, so I used
+standard multi-purpose copy paper soaked with insulating varnish. Not ideal, but
+it worked.
+
+I ended up winding the coil with more turns per layer and less layers than the
+original. The rebuilt coil measures 7.2 ohms, so a little low, but way better
+than the sub-4 ohm resistance from before.
+
+![Picture of the rewound coil next to an original coil](coil_rewound.jpg)
+
+The new coil tests out fine using a bench supply, and should be easy to
+calibrate with the firmware to match the original coils.
