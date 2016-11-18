@@ -86,6 +86,7 @@ const size_t notes_per_slave(10);
 
 // Power Supply
 const float minimum_ps_voltage(10.0f); // Minimum voltage to consider PS working
+const size_t max_notes_active(10); // Maximum simultaneous notes to not overload PS
 
 // Duty Cycle Settings
 const uint8_t pwm_bits(12); // 0 - 4095 <-- must match slaves!
@@ -123,6 +124,7 @@ const uint16_t ts_max_y(4000);
 const uint32_t blink_time(20000); // microseconds
 const uint32_t ps_en_toggle_time(1000); // microseconds
 const uint32_t ps_settle_time(500); // milliseconds
+const uint32_t note_strike_time(90); // milliseconds <-- must match slaves!
 const uint32_t slave_post_timeout(3000); // milliseconds (after ps_settle_time)
 const uint32_t slave_status_interval(1000); // milliseconds
 const uint32_t sleep_time(5 * 60 * 1000); // milliseconds
@@ -197,6 +199,9 @@ void OnProgramChange(uint8_t channel, uint8_t program);
 void OnSystemExclusive(const uint8_t* data, uint16_t length, bool complete);
 // void OnRealTimeSystem(uint8_t realtimebyte);
 // void OnTimeCodeQuarterFrame(uint16_t data);
+
+// How many notes are available without exceeding max_notes_active?
+size_t notes_available();
 
 // Scale a MIDI velocity (7-bit) to our 12-bit velocity
 uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note);
@@ -279,6 +284,7 @@ int16_t fb_selected_line(0); // Which line in the file browse list is currently 
 // Slave status
 uint8_t slaves_found(0); // How many slaves we found during POST
 uint8_t current_slave(0); // The current slave we are checking the status of
+size_t notes_active(0); // How many notes are currently being struck
 
 // Power supply
 bool ps_enabled(true); // Is the power supply enabled?
@@ -305,6 +311,7 @@ elapsedMicros ps_en_timer;
 elapsedMillis sleep_timer;
 elapsedMillis doorbell_timer;
 elapsedMillis slave_status_timer;
+elapsedMillis note_strike_timer[max_notes_active];
 
 // Serial IO
 HardwareSerial midi = HardwareSerial();
@@ -971,6 +978,31 @@ void OnSystemExclusive(const uint8_t* data, uint16_t length, bool complete)
   }
 }
 
+size_t notes_available()
+{
+  // Check for completed strikes
+  for (size_t note(0); note < notes_active; )
+  {
+    if (note_strike_timer[note] >= note_strike_time)
+    {
+      // Skip the last note
+      if (note < (notes_active - 1))
+      {
+        // Move the last timer to this spot
+        note_strike_timer[note] = note_strike_timer[notes_active - 1];
+      }
+      notes_active--;
+    }
+    else
+    {
+      note++;
+    }
+  }
+
+  // Return how many notes are available
+  return max_notes_active - notes_active;
+}
+
 uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note)
 {
   // Don't worry about MIDI velocity == 0, that must be taken care of before we
@@ -1007,6 +1039,18 @@ uint16_t scale_midi_velocity(const uint8_t& midi_velocity, const uint8_t& note)
 
 void send_chime(const uint8_t& address, const uint8_t& channel, const uint16_t& velocity)
 {
+  // Verify we aren't striking too many chimes at once
+  if (notes_available())
+  {
+    // Start strike timer
+    note_strike_timer[notes_active++] = 0;
+  }
+  else
+  {
+    // We are striking the max number of notes, ignore this request
+    return;
+  }
+
   // Packetize message
   uint8_t buffer[sizeof(uint8_t) + sizeof(uint16_t)];
   memcpy(buffer + 0, &channel, sizeof(uint8_t));
