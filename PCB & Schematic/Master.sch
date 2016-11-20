@@ -7940,6 +7940,11 @@ diameter 2.54 mm, horizontal, grid 10.16 mm</description>
 <wire x1="20.32" y1="7.62" x2="2.54" y2="7.62" width="0.1524" layer="91"/>
 <label x="2.54" y="7.62" size="1.778" layer="95"/>
 </segment>
+<segment>
+<pinref part="M1" gate="G$1" pin="D5"/>
+<wire x1="259.08" y1="38.1" x2="276.86" y2="38.1" width="0.1524" layer="91"/>
+<label x="259.08" y="38.1" size="1.778" layer="95"/>
+</segment>
 </net>
 <net name="TOUCH_SDA" class="0">
 <segment>
