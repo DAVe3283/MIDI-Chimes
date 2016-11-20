@@ -7786,7 +7786,7 @@ UG_RESULT UG_TextboxCreate( UG_WINDOW* wnd, UG_TEXTBOX* txb, UG_U8 id, UG_S16 xs
    obj->a_abs.xe = -1;
    obj->a_abs.ye = -1;
    obj->id = id;
-   obj->state |= OBJ_STATE_VISIBLE | OBJ_STATE_REDRAW | OBJ_STATE_VALID;
+   obj->state |= OBJ_STATE_VISIBLE | OBJ_STATE_REDRAW | OBJ_STATE_VALID | OBJ_STATE_TOUCH_ENABLE;
    obj->data = (void*)txb;
 
    /* Update function: Do your thing! */
@@ -8048,8 +8048,16 @@ void _UG_TextboxUpdate(UG_WINDOW* wnd, UG_OBJECT* obj)
    /* -------------------------------------------------- */
    /* Object touch section                               */
    /* -------------------------------------------------- */
-
-   /* Textbox doesn't support touch */
+   if ( obj->touch_state & OBJ_TOUCH_STATE_CHANGED )
+   {
+      /* Handle 'click' event */
+      if ( obj->touch_state & OBJ_TOUCH_STATE_CLICK_ON_OBJECT )
+      {
+         obj->event = OBJ_EVENT_CLICKED;
+         obj->state |= OBJ_STATE_UPDATE;
+      }
+      obj->touch_state &= ~OBJ_TOUCH_STATE_CHANGED;
+   }
 
    /* -------------------------------------------------- */
    /* Object update section                              */
