@@ -95,7 +95,11 @@ This is probably a bad enough option it isn't worth implementing.
 ## Decision
 
 I will follow the spec, but implement an "ALL" channel that listens for tubular
-bells on all channels. This will not be the default.
+bells on all channels.
+
+Internally, both the Teensy USB MIDI library and my library use channel 0 to
+indicate ALL/ANY. So I have to add 1 to the channel as it comes in over the MIDI
+port to match USB MIDI behavior.
 
 # MIDI OUT / THRU
 

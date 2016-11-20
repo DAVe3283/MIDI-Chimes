@@ -10,9 +10,7 @@
 // * See Notes/MIDI.md for channel, program, and OUT/THRU information.
 // * Implement settings
 //   * Storing them in EEPROM is fine
-// * Handle MIDI program change events
-//   * We are technically Program 0xE "Tubular Bells"
-//   * We might want to handle other things, or everything on the channel?
+// * Handle per-channel volume?
 // * Make the display do useful things
 //   * Show input source (USB or physical MIDI)
 //   * Options
@@ -71,7 +69,7 @@ using namespace midi_chimes;
 // Constants
 // -----------------------------------------------------------------------------
 
-// I2C config
+// I²C config
 const uint8_t i2c_slave_base_address(0x10); // Starting address for slaves
 const uint8_t i2c_slave_ack(0x06); // ACK sentinel expected from the slaves
 
@@ -274,7 +272,7 @@ void doorbell_callback(UG_MESSAGE* msg);
 // -----------------------------------------------------------------------------
 
 // User settings
-uint8_t our_channel(0); // Current channel (0-15)
+uint8_t our_channel(0); // Current channel (0 = all, 1-16)
 int8_t master_volume(100); // Master volume (0-100, 0 means mute, steps of 10)
 bool override_velocity(false); // Override velocity to master volume (true), or scale it by master volume (false)
 bool play_all_programs(false); // Play all programs (instruments), or just Tubular Bells?
@@ -294,7 +292,7 @@ bool ps_en_high(false); // Is the PS_EN pin high currently?
 uint16_t backlight_pwm(lcd_bl_pwm_max);
 
 // MIDI state
-bool play_this_program(true); // Do we play notes for the current program?
+bool play_this_program[16]; // Do we play notes for the current program?
 bool midi_master_volume_14bit(false); // Is the master volume message 14-bit? (or just 7-bit)
 bool midi_receiving_sysex(false); // Are we currently receiving a system exclusive message?
 uint8_t midi_sysex_buffer[8] = {}; // Buffer long enough to hold the longest message we will handle
@@ -601,6 +599,13 @@ void setup()
   }
   UG_ConsolePutString("done.\n");
 
+  // Initialize MIDI variables
+  for (int channel(0); channel < 16; ++channel)
+  {
+    // Assume everything is tubular bells until told otherwise
+    play_this_program[channel] = true;
+  }
+
   // Configure USB MIDI
   // usbMIDI.setHandleNoteOff(OnNoteOff); // Not needed (might for OUT/THRU?)
   usbMIDI.setHandleNoteOn(OnNoteOn);
@@ -715,8 +720,8 @@ void loop()
     }
 
     // Parse
-    const uint8_t command(status & 0xF0); // Mask off channel
-    const uint8_t channel(status & 0x0F); // Mask off command
+    const uint8_t command( status & 0xF0);      // Mask off command
+    const uint8_t channel((status & 0x0F) + 1); // Mask off channel, add 1 to match usbMIDI
 
     // Find how many data bytes we need
     int required_data_bytes(0);
@@ -873,8 +878,16 @@ void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
     return;
   }
 
-  // Are we handling this channel & program (instrument)?
-  if ((channel == our_channel) && play_this_program)
+  // Verify the channel is valid
+  if ((channel < 1) || (channel > 16))
+  {
+    return;
+  }
+
+  // Are we handling this channel and/or program (instrument)?
+  const bool channel_valid((our_channel == 0) || (channel == our_channel));
+  const bool play_channel(play_all_programs || play_this_program[channel - 1]);
+  if (channel_valid && play_channel)
   {
     // Lookup note
     uint8_t slave_address, slave_channel;
@@ -896,7 +909,7 @@ void OnControlChange(uint8_t channel, uint8_t control, uint8_t value)
   // TODO: MIDI out/thru
 
   // Skip other channels
-  if (channel != our_channel)
+  if (our_channel && (channel != our_channel))
   {
     return;
   }
@@ -926,14 +939,14 @@ void OnProgramChange(uint8_t channel, uint8_t program)
 {
   power_activity();
 
-  if (channel == our_channel)
+  // Verify the channel is valid
+  if ((channel < 1) || (channel > 16))
   {
-    play_this_program = play_all_programs || (program == midi_prog_tubular_bells);
+    return;
   }
-  else
-  {
-    // TODO: MIDI out/thru
-  }
+
+  play_this_program[channel - 1] = (program == midi_prog_tubular_bells);
+  // TODO: MIDI out/thru
 }
 
 void OnSystemExclusive(const uint8_t* data, uint16_t length, bool complete)
