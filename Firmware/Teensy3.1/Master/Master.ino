@@ -10,6 +10,8 @@
 // * See Notes/MIDI.md for channel, program, and OUT/THRU information.
 // * Implement settings
 //   * Storing them in EEPROM is fine
+// * Implement channel selection
+// * Implement MIDI OUT and THRU
 // * Handle per-channel volume?
 // * Make the display do useful things
 //   * Show input source (USB or physical MIDI)
@@ -24,6 +26,10 @@
 //   * Play doorbel tone from sd "doorbell" folder :P
 // * Stop other playback while doorbell is playing?
 // -----------------------------------------------------------------------------
+
+#define VERSION_MAJOR 0
+#define VERSION_MINOR 5
+#define VERSION_REVISION 0
 
 // Comment this line out if using the resistive touchscreen layer
 //#define CAPACITIVE_TS
@@ -154,6 +160,11 @@ const char fa_icon_file_sound[] = "m";    // File, Sound / Music (outline)
 const char fa_icon_file_config[] = "o";   // File, Code / Config (outline)
 const char fa_icon_sleep_leaf[] = "C";    // Leaf (sleep)
 const char fa_icon_bell[] = "Y";          // Bell
+const char fa_icon_music[] = "D";         // Music Note (Beamed)
+const char fa_icon_usb[] = "y";           // USB Logo
+const char fa_icon_info[] = "S";          // Information (in circle)
+const char fa_icon_exclaim[] = "!";       // Exclamation (in circle)
+const char fa_icon_question[] = "?";      // Question (in circle)
 
 // MIDI Commands
 const uint8_t midi_cmd_note_off(0x80);
@@ -253,10 +264,9 @@ void main_callback(UG_MESSAGE* msg);
 void draw_settings_window();
 void settings_callback(UG_MESSAGE* msg);
 
-// File Browse window
-void draw_fb_window();
-void fb_window_callback(UG_MESSAGE* msg);
-void fb_draw_highlight(int16_t line);
+// About window
+void draw_about_window();
+void about_window_callback(UG_MESSAGE* msg);
 
 // Sleep window
 void draw_sleep_window();
@@ -276,8 +286,6 @@ uint8_t our_channel(0); // Current channel (0 = all, 1-16)
 int8_t master_volume(100); // Master volume (0-100, 0 means mute, steps of 10)
 bool override_velocity(false); // Override velocity to master volume (true), or scale it by master volume (false)
 bool play_all_programs(false); // Play all programs (instruments), or just Tubular Bells?
-
-int16_t fb_selected_line(0); // Which line in the file browse list is currently highlighted
 
 // Slave status
 uint8_t slaves_found(0); // How many slaves we found during POST
@@ -334,25 +342,20 @@ UG_GUI gui;
 // Main Window
 UG_WINDOW main_window;
 UG_BUTTON main_window_button_settings;
-UG_BUTTON main_window_button_browse;
+UG_BUTTON main_window_button_about;
 UG_BUTTON main_window_button_vol_dn;
 UG_BUTTON main_window_button_vol_up;
 UG_PROGRESSBAR main_window_prb_volume;
 UG_OBJECT main_window_buffer[5];
 char volume_text_buffer[5] = { 0 };
 
-// File Browse window
-#define FB_LIST_SIZE 7
-UG_WINDOW fb_window;
-UG_BUTTON fb_up_button;
-UG_BUTTON fb_down_button;
-UG_BUTTON fb_cancel_button;
-UG_BUTTON fb_select_button;
-UG_TEXTBOX fb_current_path;
-UG_TEXTBOX fb_file_list[FB_LIST_SIZE];
-UG_OBJECT fb_window_buffer[FB_LIST_SIZE+6];
-char selected_file_buffer[32] = { 0 };
-char file_list_buffer[FB_LIST_SIZE][32] = { 0 };
+// About window
+UG_WINDOW about_window;
+UG_TEXTBOX about_icon_midi;
+UG_TEXTBOX about_icon_usb;
+UG_TEXTBOX about_title;
+UG_TEXTBOX about_text;
+UG_OBJECT obj_buff_about_window[4];
 
 // Settings Window
 UG_WINDOW settings_window;
@@ -625,7 +628,7 @@ void setup()
   UG_ConsolePutString("Initializing \xE6GUI...");
   // Draw windows
   draw_main_window();
-  draw_fb_window();
+  draw_about_window();
   draw_settings_window();
   draw_sleep_window();
   draw_doorbell_window();
@@ -830,7 +833,7 @@ void loop()
     const int y(p.x);
     const int x(tft.width() - p.y);
 
-    // New GUI Test
+    // Handle touch event
     UG_TouchUpdate(x, y, TOUCH_STATE_PRESSED);
   }
   else
@@ -851,13 +854,14 @@ void loop()
     const int x(p.y);
     const int y(tft.height() - p.x);
 
-    // New GUI Test
+    // Handle touch event
     UG_TouchUpdate(x, y, touched ? TOUCH_STATE_PRESSED : TOUCH_STATE_RELEASED);
   }
   else
   {
     if (!touched)
     {
+      // Indicate touch released
       UG_TouchUpdate(-1, -1, TOUCH_STATE_RELEASED);
     }
   }
@@ -1704,14 +1708,14 @@ void draw_main_window()
   UG_ButtonSetFont(&main_window, BTN_ID_2, &font_FontAwesome_mod_50X40);
   UG_ButtonSetText(&main_window, BTN_ID_2, fa_icon_vol_up);
 
-  // Browse button
-  UG_ButtonCreate(&main_window, &main_window_button_browse, BTN_ID_3,
+  // About button
+  UG_ButtonCreate(&main_window, &main_window_button_about, BTN_ID_3,
     width - padding - button_size,
     padding,
     width - padding,
     padding + button_size);
   UG_ButtonSetFont(&main_window, BTN_ID_3, &font_FontAwesome_mod_50X40);
-  UG_ButtonSetText(&main_window, BTN_ID_3, fa_icon_folder_open);
+  UG_ButtonSetText(&main_window, BTN_ID_3, fa_icon_info);
 
   // Volume progress bar
   UG_ProgressbarCreate(&main_window, &main_window_prb_volume, PRB_ID_0,
@@ -1752,7 +1756,7 @@ void main_callback(UG_MESSAGE* msg)
 
     // Browse button
     case BTN_ID_3:
-      UG_WindowShow(&fb_window);
+      UG_WindowShow(&about_window);
       break;
 
     default:
@@ -1766,7 +1770,7 @@ void main_callback(UG_MESSAGE* msg)
 void draw_settings_window()
 {
   UG_WindowCreate(&settings_window, obj_buff_settings_window, sizeof(obj_buff_settings_window) / sizeof(*obj_buff_settings_window), settings_callback);
-  UG_WindowResize(&settings_window, 20, 20, 319-20, 239-20);
+  UG_WindowResize(&settings_window, 19, 19, 319-20, 239-20);
   UG_WindowSetTitleText(&settings_window, "\xE6GUI Test Window");
   UG_WindowSetTitleTextFont(&settings_window, &FONT_8X12);
   UG_ButtonCreate(&settings_window, &settings_ps_on_button, BTN_ID_0, 10, 10, 100,  60);
@@ -1843,145 +1847,75 @@ void settings_callback(UG_MESSAGE* msg)
   }
 }
 
-void draw_fb_window()
+void draw_about_window()
 {
-  // Window setup
-  const uint16_t window_padding(10);
-  UG_WindowCreate(&fb_window, fb_window_buffer, sizeof(fb_window_buffer) / sizeof(*fb_window_buffer), fb_window_callback);
-  UG_WindowResize(&fb_window,
-    window_padding,
-    window_padding*2,
-    UG_WindowGetOuterWidth(&main_window) - window_padding,
-    UG_WindowGetOuterHeight(&main_window) - window_padding);
-  UG_WindowSetTitleTextAlignment(&fb_window, ALIGN_CENTER);
-  UG_WindowSetTitleText(&fb_window, "Select File");
-  UG_WindowSetTitleTextFont(&fb_window, &FONT_8X12);
+  // Window layout
+  UG_WindowCreate(&about_window, obj_buff_about_window, sizeof(obj_buff_about_window) / sizeof(*obj_buff_about_window), about_window_callback);
+  UG_WindowResize(&about_window, 24, 39, 319-25, 239-40);
+  UG_WindowSetTitleTextAlignment(&about_window, ALIGN_CENTER);
+  UG_WindowSetTitleText(&about_window, "About MIDI Chimes");
+  // UG_WindowSetBackColor(&about_window, C_FOREST_GREEN);
+  // UG_WindowSetForeColor(&about_window, C_WHITE);
 
   // UI layout variables
-  const uint16_t width(UG_WindowGetInnerWidth(&fb_window));
-  const uint16_t height(UG_WindowGetInnerHeight(&fb_window));
+  const uint16_t width(UG_WindowGetInnerWidth(&about_window));
+  const uint16_t height(UG_WindowGetInnerHeight(&about_window));
   const uint16_t padding(5);
-  const uint16_t button_size(50);
+  const uint16_t icon_size(50);
 
-  // Scroll up button (top right)
-  UG_ButtonCreate(&fb_window, &fb_up_button, BTN_ID_0,
-    width - padding - button_size,
+  // MIDI icon
+  UG_TextboxCreate(&about_window, &about_icon_midi, TXB_ID_0,
+    padding,                // top-left x
+    padding,                // top-left y
+    padding + icon_size,  // bottom-right x
+    padding + icon_size); // bottom-right y
+  UG_TextboxSetFont(&about_window, TXB_ID_0, &font_FontAwesome_mod_50X40);
+  UG_TextboxSetAlignment(&about_window, TXB_ID_0, ALIGN_CENTER);
+  UG_TextboxSetText(&about_window, TXB_ID_0, fa_icon_music);
+
+  // USB icon
+  UG_TextboxCreate(&about_window, &about_icon_usb, TXB_ID_1,
+    width - padding - icon_size,
     padding,
     width - padding,
-    padding + button_size);
-  UG_ButtonSetFont(&fb_window, BTN_ID_0, &font_FontAwesome_mod_50X40);
-  UG_ButtonSetText(&fb_window, BTN_ID_0, fa_icon_level_up);
+    padding + icon_size);
+  UG_TextboxSetFont(&about_window, TXB_ID_1, &font_FontAwesome_mod_50X40);
+  UG_TextboxSetAlignment(&about_window, TXB_ID_1, ALIGN_CENTER);
+  UG_TextboxSetText(&about_window, TXB_ID_1, fa_icon_usb);
 
-  // Scroll down button (bottom right)
-  UG_ButtonCreate(&fb_window, &fb_down_button, BTN_ID_1,
-    width - padding - button_size,
-    height - padding - button_size,
+  // Title text
+  UG_TextboxCreate(&about_window, &about_title, TXB_ID_2,
+    padding + icon_size + padding,
+    padding,
+    width - padding - icon_size - padding,
+    padding + icon_size);
+  UG_TextboxSetFont(&about_window, TXB_ID_2, &FONT_12X20);
+  UG_TextboxSetAlignment(&about_window, TXB_ID_2, ALIGN_CENTER);
+  UG_TextboxSetText(&about_window, TXB_ID_2, "MIDI\nChimes");
+
+  // About text
+  UG_TextboxCreate(&about_window, &about_text, TXB_ID_3,
+    padding,
+    padding + icon_size + padding,
     width - padding,
     height - padding);
-  UG_ButtonSetFont(&fb_window, BTN_ID_1, &font_FontAwesome_mod_50X40);
-  UG_ButtonSetText(&fb_window, BTN_ID_1, fa_icon_level_down);
-
-  // Cancel/close button (top left)
-  UG_ButtonCreate(&fb_window, &fb_cancel_button, BTN_ID_2,
-    padding,
-    padding,
-    padding + button_size,
-    padding + button_size);
-  UG_ButtonSetFont(&fb_window, BTN_ID_2, &FONT_24X40);
-  UG_ButtonSetText(&fb_window, BTN_ID_2, "X");
-
-  // Select button (center right)
-  UG_ButtonCreate(&fb_window, &fb_select_button, BTN_ID_3,
-    width - padding - button_size,
-    padding + button_size + padding,
-    width - padding,
-    height - padding - button_size - padding);
-  UG_ButtonSetFont(&fb_window, BTN_ID_3, &FONT_24X40);
-  UG_ButtonSetText(&fb_window, BTN_ID_3, ">");
-
-  const uint16_t line_height = 16;  // Height of a single line in the file list. Depends on font
-  // File list (main area)
-  for (int i = 0; i < FB_LIST_SIZE; i++)
-  {
-    uint8_t txb_id = i;
-    UG_TextboxCreate(&fb_window, &fb_file_list[i], txb_id,
-      padding,
-      padding + button_size + padding + (i*line_height),
-      width - padding - button_size - padding,
-      padding + button_size + padding + ((i+1)*line_height));
-    UG_TextboxSetFont(&fb_window, txb_id, &FONT_10X16);
-    UG_TextboxSetAlignment(&fb_window, txb_id, ALIGN_TOP_LEFT);
-    UG_TextboxSetBackColor(&fb_window, txb_id, C_WHITE);
-    UG_TextboxSetForeColor(&fb_window, txb_id, C_BLACK);
-    sprintf(file_list_buffer[i], "file%d.mid", txb_id);
-    UG_TextboxSetText(&fb_window, txb_id, file_list_buffer[i]);
-  }
-
-  // Current path text box (top center)
-  UG_TextboxCreate(&fb_window, &fb_current_path, (FB_LIST_SIZE+1),
-    padding + button_size + padding,
-    padding,
-    width - padding - button_size - padding,
-    padding + button_size);
-  UG_TextboxSetFont(&fb_window, (FB_LIST_SIZE+1), &FONT_10X16);
-  UG_TextboxSetAlignment(&fb_window, (FB_LIST_SIZE+1), ALIGN_CENTER);
-  UG_TextboxSetBackColor(&fb_window, (FB_LIST_SIZE+1), C_WHITE);
-  UG_TextboxSetForeColor(&fb_window, (FB_LIST_SIZE+1), C_BLACK);
-  UG_TextboxSetText(&fb_window, (FB_LIST_SIZE+1), "active_file.mid");
-
-  // Highlight the first line
-  fb_draw_highlight(0);
+  // UG_TextboxSetFont(&about_window, TXB_ID_3, &FONT_12X20);
+  UG_TextboxSetAlignment(&about_window, TXB_ID_3, ALIGN_TOP_LEFT);
+  char* about_string = new char[512]();
+  sprintf(about_string,
+    "MIDI Chimes Master Board\n\nVersion %d.%d.%d\nCompiled %s %s\n\ngithub.com/DAVe3283/MIDI-Chimes",
+    VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION,
+    __DATE__, __TIME__);
+  UG_TextboxSetText(&about_window, TXB_ID_3, about_string);
 }
 
-void fb_window_callback(UG_MESSAGE* msg)
+void about_window_callback(UG_MESSAGE* msg)
 {
-  if ((msg->type == MSG_TYPE_OBJECT) &&
-      (msg->id == OBJ_TYPE_BUTTON) &&
-      (msg->event == BTN_EVENT_CLICKED))
+  if (msg->event == OBJ_EVENT_CLICKED)
   {
-    switch (msg->sub_id)
-    {
-    case BTN_ID_0:  // up button
-      fb_draw_highlight(fb_selected_line - 1);
-      break;
-      
-    case BTN_ID_1:  // down button
-      fb_draw_highlight(fb_selected_line + 1);
-      break;
-      
-    case BTN_ID_2:  // Close window
-      UG_WindowHide(&fb_window);
-      break;
-
-    case BTN_ID_3:  // Select file/folder
-      UG_TextboxSetText(&fb_window, (FB_LIST_SIZE+1), UG_TextboxGetText(&fb_window, fb_selected_line));
-      break;
-      
-    default:
-      break;
-    }
+    // Close the about window
+    UG_WindowHide(&about_window);
   }
-}
-
-void fb_draw_highlight(int16_t selected_line)
-{
-  // Deselect the previously selected line
-  UG_TextboxSetBackColor(&fb_window, fb_selected_line, C_WHITE);
-
-  // Change the selectionto the newly selected line
-  fb_selected_line = selected_line;
-
-  // Limit the selection max and min.
-  // TODO: Scroll through directory entries
-  if (fb_selected_line <= 0) { fb_selected_line = 0; }
-  if (fb_selected_line >= FB_LIST_SIZE-1) { fb_selected_line = FB_LIST_SIZE-1; }
-
-  // Redraw highlight line in new location
-  UG_TextboxSetBackColor(&fb_window, fb_selected_line, selected_color);
-
-  // Debug output
-  sprintf(selected_file_buffer, "sel: %d", fb_selected_line); 
-  UG_TextboxSetText(&fb_window, (FB_LIST_SIZE+1), selected_file_buffer);
 }
 
 void draw_sleep_window()
