@@ -29,7 +29,7 @@
 
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 5
-#define VERSION_REVISION 0
+#define VERSION_REVISION 1
 
 // Comment this line out if using the resistive touchscreen layer
 //#define CAPACITIVE_TS
@@ -300,7 +300,7 @@ bool ps_en_high(false); // Is the PS_EN pin high currently?
 uint16_t backlight_pwm(lcd_bl_pwm_max);
 
 // MIDI state
-bool play_this_program[16]; // Do we play notes for the current program?
+bool play_this_program[17]; // Do we play notes for the current program?
 bool midi_master_volume_14bit(false); // Is the master volume message 14-bit? (or just 7-bit)
 bool midi_receiving_sysex(false); // Are we currently receiving a system exclusive message?
 uint8_t midi_sysex_buffer[8] = {}; // Buffer long enough to hold the longest message we will handle
@@ -603,7 +603,7 @@ void setup()
   UG_ConsolePutString("done.\n");
 
   // Initialize MIDI variables
-  for (int channel(0); channel < 16; ++channel)
+  for (int channel(0); channel <= 16; ++channel)
   {
     // Assume everything is tubular bells until told otherwise
     play_this_program[channel] = true;
@@ -883,14 +883,14 @@ void OnNoteOn(uint8_t channel, uint8_t note, uint8_t velocity)
   }
 
   // Verify the channel is valid
-  if ((channel < 1) || (channel > 16))
+  if (channel > 16)
   {
     return;
   }
 
   // Are we handling this channel and/or program (instrument)?
   const bool channel_valid((our_channel == 0) || (channel == our_channel));
-  const bool play_channel(play_all_programs || play_this_program[channel - 1]);
+  const bool play_channel(play_all_programs || play_this_program[channel]);
   if (channel_valid && play_channel)
   {
     // Lookup note
@@ -949,7 +949,7 @@ void OnProgramChange(uint8_t channel, uint8_t program)
     return;
   }
 
-  play_this_program[channel - 1] = (program == midi_prog_tubular_bells);
+  play_this_program[channel] = (program == midi_prog_tubular_bells);
   // TODO: MIDI out/thru
 }
 
